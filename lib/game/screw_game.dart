@@ -2,13 +2,14 @@ import 'dart:math' as math;
 import 'package:flame/components.dart';
 import 'package:flame_forge2d/flame_forge2d.dart';
 import 'package:flutter/material.dart';
+import 'package:flame/effects.dart';
 import '../components/bolt_component.dart';
 import '../components/plate_component.dart';
 import '../components/hole_component.dart';
 import '../components/background_component.dart';
-import '../components/victory_gear.dart';
-import '../components/steam_transition.dart';
-import '../components/confetti_component.dart';
+
+import '../components/industrial_transition.dart';
+import '../components/level_clear_effect.dart';
 import '../utils/level_manager.dart';
 
 class ScrewPuzzleGame extends Forge2DGame {
@@ -50,64 +51,71 @@ class ScrewPuzzleGame extends Forge2DGame {
 
     levelManager = LevelManager(this);
 
-    // Initial Level Load
-    await levelManager.loadLevel(currentLevel);
+    // Initial Level Load without transition
+    await levelManager.loadLevel(currentLevel, transitionMode: TransitionMode.none);
 
-    // Always show the HUD (Restart Button)
-    overlays.add('HUD');
+    // Show Main Menu initially
+    overlays.add('MainMenu');
   }
+
+  bool _isVictoryTriggered = false;
 
   @override
   void update(double dt) {
     super.update(dt);
-    _checkWinCondition();
-  }
-
-  void _checkWinCondition() {
-    final plates = world.children.whereType<PlateComponent>();
-    if (plates.isEmpty) return;
-
+    
     // A level is won if all plates have fallen off the screen
+    final plates = world.children.whereType<PlateComponent>();
+    
+    // If there are no plates, or all plates are off-screen
+    if (plates.isEmpty && !_isVictoryTriggered && !overlays.isActive('LevelMap')) {
+       _triggerVictorySequence();
+       return;
+    }
+
     final viewportHeight = camera.viewport.size.y / camera.viewfinder.zoom;
     final bottomEdge = camera.viewfinder.position.y + (viewportHeight / 2) + 2;
     
     final allOffScreen = plates.every((p) => p.body.position.y > bottomEdge);
 
-    if (allOffScreen && !overlays.isActive('LevelMap')) {
+    if (allOffScreen && !_isVictoryTriggered && !overlays.isActive('LevelMap')) {
       _triggerVictorySequence();
     }
   }
 
   void _triggerVictorySequence() {
-     if (overlays.isActive('LevelMap')) return;
+     if (_isVictoryTriggered || overlays.isActive('WinMenu')) return;
+     _isVictoryTriggered = true;
      
-     // 1. Show Victory Gear & Confetti
-     add(VictoryGear());
-     add(ConfettiComponent());
+     // Spawn the level clear effect (sparks/shockwave) behind the doors
+     add(LevelClearEffect());
      
-     // 2. Increment progression
-     currentLevel++;
-     
-     // 2. Delay to show Map (Navigation choice)
-     Future.delayed(const Duration(seconds: 2), () {
-        if (!overlays.isActive('LevelMap')) {
-          overlays.add('LevelMap');
-        }
-     });
+     // Close the heavy industrial doors, then show the win menu!
+     camera.viewport.add(IndustrialTransitionComponent(
+       mode: TransitionMode.closeOnly,
+       onHalfway: () async {
+         if (!overlays.isActive('WinMenu')) {
+           overlays.add('WinMenu');
+         }
+       },
+     ));
   }
 
-  void showSteamTransition(VoidCallback onHalfway) {
-    add(SteamTransitionComponent(onComplete: onHalfway));
+  void showSteamTransition(Future<void> Function() onHalfway, {TransitionMode mode = TransitionMode.closeAndOpen}) {
+    camera.viewport.children.whereType<IndustrialTransitionComponent>().forEach((c) => c.removeFromParent());
+    camera.viewport.add(IndustrialTransitionComponent(onHalfway: onHalfway, mode: mode));
   }
 
   // --- Level Flow ---
 
   void nextLevel() {
+    _isVictoryTriggered = false;
     currentLevel++;
-    levelManager.loadLevel(currentLevel);
+    levelManager.loadLevel(currentLevel, transitionMode: TransitionMode.openOnly);
   }
 
   void resetLevel() {
+    _isVictoryTriggered = false;
     levelManager.loadLevel(currentLevel);
   }
 

@@ -1,3 +1,4 @@
+import 'package:flame/components.dart';
 import 'package:flame/effects.dart';
 import 'package:flame/events.dart';
 import 'dart:math' as math;
@@ -5,12 +6,18 @@ import 'package:flame_forge2d/flame_forge2d.dart';
 import 'package:flutter/material.dart';
 import '../game/screw_game.dart';
 
-class HoleComponent extends BodyComponent<ScrewPuzzleGame> with TapCallbacks {
+class HoleComponent extends BodyComponent<ScrewPuzzleGame> with TapCallbacks implements ScaleProvider {
   final double radius;
   final Vector2 initialPosition;
   bool isOccupied;
   bool isTargetHighlight = false;
   double _pulseTime = 0.0;
+  
+  Vector2 _scale = Vector2.all(1.0);
+  @override
+  Vector2 get scale => _scale;
+  @override
+  set scale(Vector2 value) => _scale = value;
 
   HoleComponent({
     required this.initialPosition,
@@ -56,6 +63,9 @@ class HoleComponent extends BodyComponent<ScrewPuzzleGame> with TapCallbacks {
 
   @override
   void render(Canvas canvas) {
+    canvas.save();
+    canvas.scale(scale.x);
+    
     // Inner Dark Hole
     final holePaint = Paint()..color = const Color(0xFF111111);
     canvas.drawCircle(Offset.zero, radius, holePaint);
@@ -88,6 +98,8 @@ class HoleComponent extends BodyComponent<ScrewPuzzleGame> with TapCallbacks {
         ..strokeWidth = 0.05;
       canvas.drawCircle(Offset.zero, radius * 0.9, strokeGlowPaint);
     }
+    
+    canvas.restore();
   }
 
   void playSnapSound() {

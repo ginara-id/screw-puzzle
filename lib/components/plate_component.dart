@@ -6,15 +6,17 @@ import 'package:flutter/material.dart';
 import 'dart:math';
 import '../game/screw_game.dart';
 import 'hole_component.dart';
+import 'bolt_component.dart';
 
 class PlateComponent extends BodyComponent<ScrewPuzzleGame>
-    with HasGameRef<ScrewPuzzleGame> {
+    with HasGameRef<ScrewPuzzleGame>, ContactCallbacks {
   final Vector2 size;
   final Vector2 initialPosition;
 
   PlateComponent({required this.size, required this.initialPosition});
 
   final List<Vector2> _localHoles = [];
+  double _glintTimer = Random().nextDouble() * 3.0; // Randomize start phase
 
   bool isHoleAligned(Vector2 worldPos, {double tolerance = 0.2}) {
     final localPoint = body.localPoint(worldPos);
@@ -54,6 +56,7 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
     if (_errorFlashTimer > 0) {
       _errorFlashTimer -= dt;
     }
+    _glintTimer += dt;
   }
 
   @override
@@ -78,28 +81,63 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
 
     return world.createBody(bodyDef)..createFixture(fixtureDef);
   }
+  
+  @override
+  void beginContact(Object other, Contact contact) {
+    if (other is BoltComponent) {
+      final worldManifold = WorldManifold();
+      contact.getWorldManifold(worldManifold);
+      
+      if (worldManifold.points.isNotEmpty) {
+        final point = worldManifold.points.first;
+        
+        // Calculate relative velocity
+        final v1 = body.linearVelocity;
+        final v2 = other.body.linearVelocity;
+        final relativeVelocity = (v1 - v2).length;
+        
+        // Only spawn sparks on heavy metal collisions
+        if (relativeVelocity > 5.0) {
+          showSparks(point);
+        }
+      }
+    }
+  }
 
   @override
   bool containsLocalPoint(Vector2 point) {
     return point.x.abs() <= size.x / 2 && point.y.abs() <= size.y / 2;
   }
 
-  /// 2. AAA Polish - Spark Particles on Detachment
+  /// AAA Polish - Realistic Metal Spark Particles
   void showSparks(Vector2 contactPoint) {
     final rnd = Random();
     final particle = ParticleSystemComponent(
       particle: Particle.generate(
         count: 15,
-        lifespan: 0.4,
-        generator: (i) => AcceleratedParticle(
-          acceleration: Vector2(0, 50), // Gravity
-          speed: Vector2(rnd.nextDouble() * 20 - 10, rnd.nextDouble() * -20),
-          position: contactPoint.clone(),
-          child: CircleParticle(
-            radius: 0.1,
-            paint: Paint()..color = Colors.orangeAccent,
-          ),
-        ),
+        lifespan: 0.2 + rnd.nextDouble() * 0.2,
+        generator: (i) {
+          final angle = rnd.nextDouble() * pi * 2;
+          final speed = 15 + rnd.nextDouble() * 25;
+          return AcceleratedParticle(
+            acceleration: Vector2(0, 60), // Heavy Gravity
+            speed: Vector2(cos(angle) * speed, sin(angle) * speed),
+            position: contactPoint.clone(),
+            child: ComputedParticle(
+              renderer: (canvas, particle) {
+                final fade = particle.progress > 0.5 ? (1 - particle.progress) * 2 : 1.0;
+                final paint = Paint()
+                  ..color = Colors.orangeAccent.withOpacity(fade)
+                  ..strokeWidth = 0.15
+                  ..style = PaintingStyle.stroke
+                  ..strokeCap = StrokeCap.round;
+                // Draw streaks instead of circles for fast sparks
+                final dir = Vector2(cos(angle), sin(angle)) * 0.6;
+                canvas.drawLine(Offset.zero, Offset(dir.x, dir.y), paint);
+              }
+            ),
+          );
+        }
       ),
     );
     parent?.add(particle);
@@ -113,7 +151,7 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
       height: size.y,
     );
 
-    // 1. PSEUDO-3D DROP SHADOW (Offset x:2, y:4 in world units is huge, so we scale it)
+    // 1. PSEUDO-3D DROP SHADOW
     final shadowOffset = const Offset(0.2, 0.4);
     final shadowPaint = Paint()
       ..color = Colors.black.withOpacity(0.5)
@@ -121,10 +159,9 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
     canvas.drawRect(rect.shift(shadowOffset), shadowPaint);
 
     // --- START PUNCH-OUT RENDERING ---
-    // We save a layer to perform 'holes' using BlendMode.dstOut
     canvas.saveLayer(rect, Paint());
 
-    // 2. AGED COPPER SURFACE
+    // 2. AGED COPPER/IRON SURFACE
     final paint = Paint()
       ..shader = LinearGradient(
         begin: Alignment.topLeft,
@@ -132,24 +169,43 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
         colors: const [
           Color(0xFFB87333), // Copper Base
           Color(0xFF8B4513), // Bronze Shadow
-          Color(0xFF4E733E), // Verdigris (Greenish rust)
+          Color(0xFF4E733E), // Verdigris
           Color(0xFFB87333),
         ],
         stops: const [0.0, 0.4, 0.8, 1.0],
       ).createShader(rect);
 
     canvas.drawRect(rect, paint);
+    
+    // 3. DYNAMIC METALLIC GLINT (Shine sweeps across periodically)
+    final glintProgress = (_glintTimer % 3.0) / 3.0; 
+    final glintX = -size.x + (glintProgress * size.x * 3);
+    
+    final glintPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          Colors.white.withOpacity(0.0),
+          Colors.white.withOpacity(0.5),
+          Colors.white.withOpacity(0.0),
+        ],
+        stops: const [0.0, 0.5, 1.0],
+      ).createShader(Rect.fromLTWH(glintX, -size.y, size.x * 0.8, size.y * 2))
+      ..blendMode = BlendMode.screen;
+      
+    canvas.drawRect(rect, glintPaint);
 
-    // 2.5 SURFACE SCRATCHES
+    // 4. SURFACE SCRATCHES
     final scratchPaint = Paint()
-      ..color = Colors.white.withOpacity(0.1)
+      ..color = Colors.white.withOpacity(0.15)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.02;
+      ..strokeWidth = 0.03;
     canvas.drawLine(Offset(-size.x / 2, -size.y / 2), Offset(size.x / 2, size.y / 2), scratchPaint);
     canvas.drawLine(Offset(size.x / 4, -size.y / 2), Offset(-size.x / 4, size.y / 2), scratchPaint);
 
 
-    // 3. ERROR FLASH
+    // 5. ERROR FLASH
     if (_errorFlashTimer > 0) {
       final flashPaint = Paint()
         ..color = Colors.red.withOpacity(
@@ -158,14 +214,14 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
       canvas.drawRect(rect, flashPaint);
     }
 
-    // 4. BEVELED EDGES
+    // 6. BEVELED EDGES
     final borderPaint = Paint()
-      ..color = Colors.white.withOpacity(0.1)
+      ..color = Colors.white.withOpacity(0.2)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.05;
     canvas.drawRect(rect, borderPaint);
 
-    // 5. THE PUNCH (Drilled holes in this wood)
+    // 7. THE PUNCH (Drilled holes in the metal)
     final punchPaint = Paint()
       ..blendMode = BlendMode.dstOut
       ..style = PaintingStyle.fill;
@@ -177,7 +233,7 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
     // Restore layer to composite back with transparency
     canvas.restore();
 
-    // 6. BRASS RIVETS & DEPTH
+    // 8. BRASS RIVETS & DEPTH
     final rivetRadius = size.x * 0.04;
     final inset = rivetRadius * 2.5;
 
@@ -187,7 +243,7 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
       ).createShader(Rect.fromCircle(center: Offset.zero, radius: rivetRadius));
 
     final rivetShadowPaint = Paint()
-      ..color = Colors.black.withOpacity(0.5)
+      ..color = Colors.black.withOpacity(0.6)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 0.05);
 
     final offsets = [
@@ -204,6 +260,5 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
       canvas.drawCircle(Offset.zero, rivetRadius, brassRivetPaint);
       canvas.restore();
     }
-
   }
 }
