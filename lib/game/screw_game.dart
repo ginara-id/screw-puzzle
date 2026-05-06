@@ -11,9 +11,11 @@ import '../components/background_component.dart';
 import '../components/industrial_transition.dart';
 import '../components/level_clear_effect.dart';
 import '../utils/level_manager.dart';
+import '../utils/audio_service.dart';
 
 class ScrewPuzzleGame extends Forge2DGame {
   late final LevelManager levelManager;
+  final audio = AudioService();
   int currentLevel = 1;
 
   // Collision Categories
@@ -22,6 +24,21 @@ class ScrewPuzzleGame extends Forge2DGame {
 
   // Interaction State
   BoltComponent? _activeBolt;
+  BoltComponent? get activeBolt => _activeBolt;
+  int get remainingPlates => world.children.whereType<PlateComponent>().length;
+
+  bool isHoleBlocked(HoleComponent hole) {
+    for (final plate in world.children.whereType<PlateComponent>()) {
+      // If the plate physically covers any part of the hole
+      if (plate.isOverlappingCircle(hole.position, hole.radius)) {
+        // It's only NOT blocked if the plate has a matching hole aligned here
+        if (!plate.isHoleAligned(hole.position)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
 
   final _boltJoints = <BoltComponent, List<RevoluteJoint>>{};
   final _boltToHole = <BoltComponent, HoleComponent>{};
@@ -42,6 +59,10 @@ class ScrewPuzzleGame extends Forge2DGame {
   Future<void> onLoad() async {
     await super.onLoad();
 
+    // Initialize Audio
+    await audio.init();
+    audio.playMenuBGM();
+
     // 0. Static Background
     await add(BackgroundComponent());
 
@@ -52,7 +73,10 @@ class ScrewPuzzleGame extends Forge2DGame {
     levelManager = LevelManager(this);
 
     // Initial Level Load without transition
-    await levelManager.loadLevel(currentLevel, transitionMode: TransitionMode.none);
+    await levelManager.loadLevel(
+      currentLevel,
+      transitionMode: TransitionMode.none,
+    );
 
     // Show Main Menu initially
     overlays.add('MainMenu');
@@ -63,47 +87,60 @@ class ScrewPuzzleGame extends Forge2DGame {
   @override
   void update(double dt) {
     super.update(dt);
-    
+
     // A level is won if all plates have fallen off the screen
     final plates = world.children.whereType<PlateComponent>();
-    
+
     // If there are no plates, or all plates are off-screen
-    if (plates.isEmpty && !_isVictoryTriggered && !overlays.isActive('LevelMap')) {
-       _triggerVictorySequence();
-       return;
+    // ONLY trigger if we are actually in a game (HUD active) and NOT in menus
+    bool isInGame = overlays.isActive('HUD') && !overlays.isActive('MainMenu');
+
+    if (isInGame && plates.isEmpty && !_isVictoryTriggered) {
+      _triggerVictorySequence();
+      return;
     }
 
     final viewportHeight = camera.viewport.size.y / camera.viewfinder.zoom;
     final bottomEdge = camera.viewfinder.position.y + (viewportHeight / 2) + 2;
-    
+
     final allOffScreen = plates.every((p) => p.body.position.y > bottomEdge);
 
-    if (allOffScreen && !_isVictoryTriggered && !overlays.isActive('LevelMap')) {
+    if (isInGame && allOffScreen && !_isVictoryTriggered) {
       _triggerVictorySequence();
     }
   }
 
   void _triggerVictorySequence() {
-     if (_isVictoryTriggered || overlays.isActive('WinMenu')) return;
-     _isVictoryTriggered = true;
-     
-     // Spawn the level clear effect (sparks/shockwave) behind the doors
-     add(LevelClearEffect());
-     
-     // Close the heavy industrial doors, then show the win menu!
-     camera.viewport.add(IndustrialTransitionComponent(
-       mode: TransitionMode.closeOnly,
-       onHalfway: () async {
-         if (!overlays.isActive('WinMenu')) {
-           overlays.add('WinMenu');
-         }
-       },
-     ));
+    if (_isVictoryTriggered || overlays.isActive('WinMenu')) return;
+    _isVictoryTriggered = true;
+
+    // Spawn the level clear effect (sparks/shockwave) behind the doors
+    add(LevelClearEffect());
+
+    // Close the heavy industrial doors, then show the win menu!
+    audio.playVictory();
+    camera.viewport.add(
+      IndustrialTransitionComponent(
+        mode: TransitionMode.closeOnly,
+        onHalfway: () async {
+          if (!overlays.isActive('WinMenu')) {
+            overlays.add('WinMenu');
+          }
+        },
+      ),
+    );
   }
 
-  void showSteamTransition(Future<void> Function() onHalfway, {TransitionMode mode = TransitionMode.closeAndOpen}) {
-    camera.viewport.children.whereType<IndustrialTransitionComponent>().forEach((c) => c.removeFromParent());
-    camera.viewport.add(IndustrialTransitionComponent(onHalfway: onHalfway, mode: mode));
+  void showSteamTransition(
+    Future<void> Function() onHalfway, {
+    TransitionMode mode = TransitionMode.closeAndOpen,
+  }) {
+    camera.viewport.children.whereType<IndustrialTransitionComponent>().forEach(
+      (c) => c.removeFromParent(),
+    );
+    camera.viewport.add(
+      IndustrialTransitionComponent(onHalfway: onHalfway, mode: mode),
+    );
   }
 
   // --- Level Flow ---
@@ -111,7 +148,20 @@ class ScrewPuzzleGame extends Forge2DGame {
   void nextLevel() {
     _isVictoryTriggered = false;
     currentLevel++;
-    levelManager.loadLevel(currentLevel, transitionMode: TransitionMode.openOnly);
+
+    if (currentLevel > 10) {
+      // Game Complete!
+      currentLevel = 1;
+      overlays.remove('HUD');
+      overlays.add('MainMenu');
+      audio.playMenuBGM();
+      return;
+    }
+
+    levelManager.loadLevel(
+      currentLevel,
+      transitionMode: TransitionMode.openOnly,
+    );
   }
 
   void resetLevel() {
@@ -163,7 +213,11 @@ class ScrewPuzzleGame extends Forge2DGame {
   void _updateHoleHighlights() {
     final active = _activeBolt != null;
     for (final hole in _holes) {
-      hole.isTargetHighlight = active && !hole.isOccupied;
+      // A hole is highlightable if:
+      // 1. A bolt is selected
+      // 2. The hole is not occupied by another bolt
+      // 3. The hole is not blocked by a solid plate section
+      hole.isTargetHighlight = active && !hole.isOccupied && !isHoleBlocked(hole);
     }
   }
 
@@ -176,29 +230,18 @@ class ScrewPuzzleGame extends Forge2DGame {
       return;
     }
 
-    // 2. Check for plate occlusion (plate covering hole)
-    PlateComponent? blocker;
-    for (final plate in world.children.whereType<PlateComponent>()) {
-      final localPoint = plate.body.localPoint(hole.position);
-      if (plate.containsLocalPoint(localPoint)) {
-        blocker = plate;
-        break;
+    // 2. Check for plate occlusion (plate covering hole) using the unified logic
+    if (isHoleBlocked(hole)) {
+      // Find the specific plate that's blocking for visual feedback
+      for (final plate in world.children.whereType<PlateComponent>()) {
+        if (plate.isOverlappingCircle(hole.position, hole.radius) && !plate.isHoleAligned(hole.position)) {
+          plate.flashError();
+          break;
+        }
       }
-    }
-
-    if (blocker != null) {
-      // 3. Alignment Exception: Can we bolt THROUGH this plate?
-      if (blocker.isHoleAligned(hole.position)) {
-        blocker = null; // Path is clear through the plate's own hole!
-      }
-    }
-
-    if (blocker != null) {
-      // Feedback: Plate is genuinely in the way (solid wood)
-      blocker.flashError();
       _activeBolt?.shake();
     } else {
-      // Success: Move to clean hole (or through an aligned plate hole)
+      // Success: Move to clean hole
       _moveBoltToHole(_activeBolt!, hole);
       _activeBolt = null;
       _updateHoleHighlights();
@@ -216,6 +259,7 @@ class ScrewPuzzleGame extends Forge2DGame {
     bolt.moveTo(
       hole.position,
       onComplete: () {
+        audio.playBoltSnap();
         // STATE: SNAPPING & RE-LOCKING
         final targetPos = hole.position;
 
@@ -227,7 +271,10 @@ class ScrewPuzzleGame extends Forge2DGame {
         for (final plate in world.children.whereType<PlateComponent>()) {
           final localPoint = plate.body.localPoint(targetPos);
           if (plate.containsLocalPoint(localPoint)) {
-            createJoint(bolt, plate);
+            // CRITICAL FIX: Only attach if the plate's hole is aligned with this target position
+            if (plate.isHoleAligned(targetPos)) {
+              createJoint(bolt, plate);
+            }
           }
         }
         bolt.isLifted = false;
@@ -250,16 +297,7 @@ class ScrewPuzzleGame extends Forge2DGame {
       return;
     }
 
-    // A hole is "blocked" if ANY plate covers it
-    bool isBlocked(HoleComponent hole) {
-      for (final plate in plates) {
-        final localPoint = plate.body.localPoint(hole.position);
-        if (plate.containsLocalPoint(localPoint)) return true;
-      }
-      return false;
-    }
-
-    final allBlocked = unoccupiedHoles.every(isBlocked);
+    final allBlocked = unoccupiedHoles.every((h) => isHoleBlocked(h));
     if (allBlocked && !overlays.isActive('GameOverMenu')) {
       // NOTE: Automatic popup disabled as per user request
       // overlays.add('GameOverMenu');
@@ -267,21 +305,43 @@ class ScrewPuzzleGame extends Forge2DGame {
   }
 
   void _releaseBolt(BoltComponent bolt) {
+    // Retrieve and remove ALL joints associated with this specific bolt
     final joints = _boltJoints.remove(bolt);
     if (joints != null) {
       for (final joint in joints) {
-        // Trigger metallic sparks at the detachment point
-        final plate = joint.bodyB.userData;
-        if (plate is PlateComponent) {
+        // Trigger visual feedback on the plate being released
+        final otherBody = joint.bodyB;
+        if (otherBody.userData is PlateComponent) {
+          final plate = otherBody.userData as PlateComponent;
           plate.showSparks(bolt.body.position);
+
+          // Give a tiny random nudge to ensure natural physics movement
+          final nudge = (math.Random().nextDouble() - 0.5) * 5.0;
+          plate.body.applyAngularImpulse(nudge);
           plate.body.setAwake(true);
         }
+        
+        // Physically destroy the joint in Forge2D
         world.destroyJoint(joint);
       }
     }
   }
 
   void createJoint(BoltComponent bolt, PlateComponent plate) {
+    // 1. Prevent duplicate joints between the same bolt and plate
+    final existingJoints = _boltJoints[bolt];
+    if (existingJoints != null) {
+      for (final joint in existingJoints) {
+        if (joint.bodyB == plate.body) {
+          return; // Already jointed to this plate
+        }
+      }
+    }
+
+    // 2. Ensure the plate visually has a hole at this attachment point
+    plate.addHole(bolt.body.position);
+
+    // 3. Create the RevoluteJoint (pin)
     final jointDef = RevoluteJointDef()
       ..initialize(bolt.body, plate.body, bolt.body.position)
       ..collideConnected = false;
@@ -289,7 +349,7 @@ class ScrewPuzzleGame extends Forge2DGame {
     final joint = RevoluteJoint(jointDef);
     world.createJoint(joint);
 
-    // Add to multi-joint collection
+    // 4. Track this joint in our management map
     _boltJoints.putIfAbsent(bolt, () => []).add(joint);
   }
 }

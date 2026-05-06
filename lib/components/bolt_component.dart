@@ -11,18 +11,14 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
   final double radius;
   final Vector2 initialPosition;
 
-  BoltComponent({required this.initialPosition, this.radius = 0.5})
+  BoltComponent({required this.initialPosition, this.radius = 0.40})
     : super(renderBody: false);
 
   bool _isLifted = false;
   bool get isLifted => _isLifted;
   set isLifted(bool value) {
     _isLifted = value;
-    if (body.fixtures.isNotEmpty) {
-      final filter = body.fixtures.first.filterData;
-      filter.maskBits = value ? 0x0000 : ScrewPuzzleGame.kPlateCategory;
-      body.fixtures.first.filterData = filter;
-    }
+    priority = value ? 100 : 3; 
 
     if (value) {
       add(
@@ -37,6 +33,13 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
     }
   }
 
+  void _updateCollision(bool canCollide) {
+    if (body.fixtures.isNotEmpty) {
+      final filter = body.fixtures.first.filterData;
+      filter.maskBits = canCollide ? ScrewPuzzleGame.kPlateCategory : 0x0000;
+      body.fixtures.first.filterData = filter;
+    }
+  }
 
   @override
   Vector2 get position => body.position;
@@ -75,59 +78,45 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
 
     final rect = Rect.fromCircle(center: Offset.zero, radius: radius);
 
-    // Metallic Head (Polished Brass)
+    // Metallic Head (Aged Industrial Iron)
     final headPaint = Paint()
       ..shader = RadialGradient(
-        center: const Alignment(-0.2, -0.2),
+        center: const Alignment(-0.3, -0.3),
         colors: [
-          const Color(0xFFFFD700), // Gold
-          const Color(0xFFDAA520), // Goldenrod
-          const Color(0xFFB8860B), // Dark Goldenrod
+          const Color(0xFF757575), // Highlight
+          const Color(0xFF424242), // Mid Iron
+          const Color(0xFF1B1B1B), // Deep Shadow
         ],
-        stops: const [0.0, 0.6, 1.0],
+        stops: const [0.0, 0.5, 1.0],
       ).createShader(rect);
 
     canvas.save();
     canvas.scale(scaleFactor);
 
-    // 1.5 SCREW THREADS (Visual only when lifted)
-    if (isLifted) {
-      final threadPaint = Paint()
-        ..color = const Color(0xFFDAA520).withOpacity(0.4)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 0.05;
-
-      for (var i = 0; i < 5; i++) {
-        final y = radius * (0.2 + (i * 0.15));
-        canvas.drawLine(Offset(-radius * 0.8, y), Offset(radius * 0.8, y + 0.1), threadPaint);
-      }
-    }
-
     canvas.drawCircle(Offset.zero, radius, headPaint);
-
+    
     final rimPaint = Paint()
-      ..color = Colors.white.withOpacity(0.5)
+      ..color = Colors.black.withOpacity(0.4)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.03;
-    canvas.drawCircle(Offset.zero, radius * 0.95, rimPaint);
+      ..strokeWidth = 0.04;
+    canvas.drawCircle(Offset.zero, radius * 0.92, rimPaint);
 
-    // PHILLIP SLOT (Engineered look)
+    // PHILLIP SLOT (Worn & Deep)
     final slotPaint = Paint()
-      ..color = Colors.black.withOpacity(0.7)
+      ..color = Colors.black.withOpacity(0.9)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.12
+      ..strokeWidth = 0.15
       ..strokeCap = StrokeCap.round;
 
     if (isLifted) {
-      canvas.rotate(0.35); 
+      canvas.rotate(0.35);
     }
 
     // DRAW THE CROSS SLOTS
-    canvas.drawLine(Offset(-radius * 0.4, 0), Offset(radius * 0.4, 0), slotPaint);
-    canvas.drawLine(Offset(0, -radius * 0.4), Offset(0, radius * 0.4), slotPaint);
+    canvas.drawLine(Offset(-radius * 0.45, 0), Offset(radius * 0.45, 0), slotPaint);
+    canvas.drawLine(Offset(0, -radius * 0.45), Offset(0, radius * 0.45), slotPaint);
 
     canvas.restore();
-
   }
 
   @override
@@ -143,9 +132,11 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
       ..friction = 0.3
       ..restitution = 0.1
       ..filter.categoryBits = ScrewPuzzleGame.kBoltHoleCategory
-      ..filter.maskBits = ScrewPuzzleGame.kPlateCategory;
+      ..filter.maskBits = ScrewPuzzleGame.kPlateCategory; // Solid by default
 
-    return world.createBody(bodyDef)..createFixture(fixtureDef);
+    return world.createBody(bodyDef)
+      ..createFixture(fixtureDef)
+      ..isBullet = true;
   }
 
   @override
@@ -166,14 +157,18 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
   }
 
   void moveTo(Vector2 target, {VoidCallback? onComplete}) {
-    isLifted = true; // Ensure lifted state during kinematic transit
+    isLifted = true; 
     body.setType(BodyType.kinematic);
+    
+    _updateCollision(false); // Disable collision during movement
+
     add(
       MoveToEffect(
         target,
         EffectController(duration: 0.3, curve: Curves.easeInOut),
         onComplete: () {
-          isLifted = false; // Restore normal state upon landing
+          _updateCollision(true); // Re-enable collision after landing
+          isLifted = false; 
           if (onComplete != null) onComplete();
         },
       ),

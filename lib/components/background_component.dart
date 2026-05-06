@@ -2,97 +2,129 @@ import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 
-class BackgroundComponent extends PositionComponent with HasGameRef {
+import '../game/screw_game.dart';
+
+class BackgroundComponent extends PositionComponent
+    with HasGameRef<ScrewPuzzleGame> {
+  bool _isLoaded = false;
+
   @override
   Future<void> onLoad() async {
     await super.onLoad();
     size = gameRef.canvasSize;
-    priority = -1; // Ensure background renders behind everything
+    priority = -10;
+    _isLoaded = true;
   }
 
   @override
   void render(Canvas canvas) {
+    if (!_isLoaded) return;
+
     final rect = size.toRect();
 
-    // 1. IMPROVED MAHOGANY WOOD TEXTURE
-    final woodPaint = Paint()
+    // 1. BLURRED FACTORY BACKGROUND (Deep Workshop)
+    final bgPaint = Paint()
+      ..shader = RadialGradient(
+        center: Alignment.center,
+        radius: 1.0,
+        colors: [const Color(0xFF1A1C1E), const Color(0xFF0A0B0C)],
+      ).createShader(rect);
+    canvas.drawRect(rect, bgPaint);
+
+    // DRAW BACKGROUND PIPES (Subtle industrial depth)
+    final pipePaint = Paint()
+      ..color = Colors.black.withOpacity(0.3)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 20.0;
+    canvas.drawLine(Offset(size.x * 0.2, 0), Offset(size.x * 0.2, size.y), pipePaint);
+    canvas.drawLine(Offset(size.x * 0.8, 0), Offset(size.x * 0.8, size.y), pipePaint);
+    canvas.drawLine(Offset(0, size.y * 0.85), Offset(size.x, size.y * 0.85), pipePaint..strokeWidth = 35.0);
+
+    // 2. THE MAIN CONSOLE (HEAVY RIVETED BOX)
+    const boardWorldWidth = 15.5;
+    const boardWorldHeight = 19.5;
+    
+    final zoom = gameRef.camera.viewfinder.zoom;
+    final boardWidth = boardWorldWidth * zoom;
+    final boardHeight = boardWorldHeight * zoom;
+
+    final boardRect = Rect.fromCenter(
+      center: Offset(size.x / 2, size.y / 2.2), // Shifted up slightly
+      width: boardWidth,
+      height: boardHeight,
+    );
+
+    // DEEP SHADOW
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(boardRect.shift(const Offset(15, 15)), const Radius.circular(5)),
+      Paint()..color = Colors.black.withOpacity(0.8)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 30),
+    );
+
+    // BORDER FRAME (Rust Metal)
+    final framePaint = Paint()
       ..shader = LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: const [
-          Color(0xFF2D1E12), 
-          Color(0xFF4D331F), // Lighter highlight
-          Color(0xFF2D1E12),
-          Color(0xFF1B120B), // Darker shadow
+        colors: [const Color(0xFF3E3E3E), const Color(0xFF1E1E1E), const Color(0xFF2D2D2D)],
+      ).createShader(boardRect);
+    canvas.drawRect(boardRect, framePaint);
+
+    // INNER AREA (Blueprint / Technical with SPOTLIGHT)
+    final innerRect = boardRect.deflate(40.0);
+    final innerPaint = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(0, -0.2),
+        radius: 1.2, // Expanded radius
+        colors: [
+          const Color(0xFF34495E), // Brighter & Wider
+          const Color(0xFF1B242C), 
+          const Color(0xFF0F1418),
         ],
-        stops: const [0.0, 0.3, 0.7, 1.0],
-      ).createShader(rect);
+        stops: const [0.0, 0.7, 1.0], // Softer falloff
+      ).createShader(innerRect);
+    canvas.drawRect(innerRect, innerPaint);
 
-    canvas.drawRect(rect, woodPaint);
+    // ADD A SOFT SPOTLIGHT GLOW
+    final glowPaint = Paint()
+      ..shader = RadialGradient(
+        colors: [Colors.white.withOpacity(0.1), Colors.transparent],
+      ).createShader(innerRect);
+    canvas.drawRect(innerRect, glowPaint);
 
-    // 2. INDUSTRIAL GRAIN & WEAR
-    final grainPaint = Paint()
-      ..color = Colors.black.withOpacity(0.2)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.03;
-
-    for (double i = 0; i < size.y; i += 0.15) {
-      canvas.drawLine(Offset(0, i), Offset(size.x, i), grainPaint);
-    }
-
-    // 3. BRASS CORNER GUARDS
-    final brassPaint = Paint()
-      ..shader = LinearGradient(
-        colors: [const Color(0xFFB8860B), const Color(0xFFFFD700), const Color(0xFFB8860B)],
-      ).createShader(Rect.fromLTWH(0, 0, 40, 40));
-
-    // Top-Left Corner
-    final cornerPath = Path()
-      ..moveTo(0, 0)
-      ..lineTo(40, 0)
-      ..lineTo(0, 40)
-      ..close();
-    canvas.drawPath(cornerPath, brassPaint);
-
-    // 4. RIVETS ON CORNER
-    final rivetPaint = Paint()..color = Colors.black.withOpacity(0.5);
-    canvas.drawCircle(const Offset(8, 8), 2, rivetPaint);
-    canvas.drawCircle(const Offset(25, 8), 2, rivetPaint);
-    canvas.drawCircle(const Offset(8, 25), 2, rivetPaint);
-
-    // 5. BLUEPRINT SKETCHES (Slightly more visible)
+    // BLUEPRINT LINES (More visible now)
     final blueprintPaint = Paint()
       ..color = const Color(0xFF4A90E2).withOpacity(0.08)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.08;
-
-    _drawBlueprintCog(canvas, Offset(size.x * 0.15, size.y * 0.25), 6, blueprintPaint);
-    _drawBlueprintCog(canvas, Offset(size.x * 0.85, size.y * 0.75), 10, blueprintPaint);
-
-    // 6. DEEP VIGNETTE
-    final shadowPaint = Paint()
-      ..shader = RadialGradient(
-        colors: [Colors.transparent, Colors.black.withOpacity(0.6)],
-        stops: const [0.4, 1.0],
-      ).createShader(rect);
-    canvas.drawRect(rect, shadowPaint);
-  }
-
-
-  void _drawBlueprintCog(Canvas canvas, Offset center, double radius, Paint paint) {
-    canvas.drawCircle(center, radius, paint);
-    const teeth = 8;
-    for (var i = 0; i < teeth; i++) {
-        final angle = (i * 2 * 3.14159) / teeth;
-        final start = const Offset(1, 0).rotate(angle) * (radius * 0.8);
-        final end = const Offset(1, 0).rotate(angle) * (radius * 1.2);
-        canvas.drawLine(center + start, center + end, paint);
+      ..strokeWidth = 1.0;
+    for (var i = 0.0; i < innerRect.width; i += 60) {
+      canvas.drawLine(Offset(innerRect.left + i, innerRect.top), Offset(innerRect.left + i, innerRect.bottom), blueprintPaint);
     }
-  }
+    for (var i = 0; i < innerRect.height; i += 60) {
+      canvas.drawLine(Offset(innerRect.left, innerRect.top + i), Offset(innerRect.right, innerRect.top + i), blueprintPaint);
+    }
+    canvas.drawCircle(boardRect.center, 150, blueprintPaint..color = blueprintPaint.color.withOpacity(0.03));
 
-  void _drawBlueprintPipe(Canvas canvas, Offset start, Offset end, Paint paint) {
-    canvas.drawLine(start, end, paint);
-    canvas.drawLine(start + const Offset(0, 0.5), end + const Offset(0, 0.5), paint);
+    // 3. RIVETS (The iconic industrial look)
+    final rivetPaint = Paint()
+      ..shader = RadialGradient(
+        colors: [const Color(0xFF555555), const Color(0xFF111111)],
+      ).createShader(Rect.fromLTWH(0, 0, 15, 15));
+    
+    void drawRivetsOnSide(Offset start, Offset end, int count) {
+      for (var i = 0; i < count; i++) {
+        final pos = Offset.lerp(start, end, i / (count - 1))!;
+        canvas.drawCircle(pos, 6, rivetPaint);
+        canvas.drawCircle(pos, 2, Paint()..color = Colors.black.withOpacity(0.4));
+      }
+    }
+
+    drawRivetsOnSide(boardRect.topLeft + const Offset(20, 20), boardRect.topRight + const Offset(-20, 20), 12);
+    drawRivetsOnSide(boardRect.bottomLeft + const Offset(20, -20), boardRect.bottomRight + const Offset(-20, -20), 12);
+    drawRivetsOnSide(boardRect.topLeft + const Offset(20, 20), boardRect.bottomLeft + const Offset(20, -20), 15);
+    drawRivetsOnSide(boardRect.topRight + const Offset(-20, 20), boardRect.bottomRight + const Offset(-20, -20), 15);
+
+    // 5. OVERALL VIGNETTE
+    canvas.drawRect(rect, Paint()..shader = RadialGradient(colors: [Colors.transparent, Colors.black.withOpacity(0.7)], stops: const [0.4, 1.0]).createShader(rect));
   }
 
   @override

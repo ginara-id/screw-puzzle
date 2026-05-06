@@ -1,11 +1,9 @@
 import 'package:flame/components.dart';
 import 'package:flame/particles.dart';
-import 'package:flame/rendering.dart';
 import 'package:flame_forge2d/flame_forge2d.dart' hide Particle;
 import 'package:flutter/material.dart';
 import 'dart:math';
 import '../game/screw_game.dart';
-import 'hole_component.dart';
 import 'bolt_component.dart';
 
 class PlateComponent extends BodyComponent<ScrewPuzzleGame>
@@ -65,39 +63,43 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
       userData: this,
       position: initialPosition,
       type: BodyType.dynamic,
-      linearDamping: 0.5,
+      linearDamping: 0.5, // Smoother, more controlled movement
       angularDamping: 0.5,
+      gravityScale: Vector2(0, 1.5),
+      allowSleep: true,
     );
 
     final shape = PolygonShape()
       ..setAsBox(size.x / 2, size.y / 2, Vector2.zero(), 0);
 
     final fixtureDef = FixtureDef(shape)
-      ..density = 5.0
-      ..friction = 0.5
-      ..restitution = 0.2
+      ..density = 1.0
+      ..friction = 0.05 // Reduced friction for smoothness
+      ..restitution = 0.05 // Low bounce
       ..filter.categoryBits = ScrewPuzzleGame.kPlateCategory
-      ..filter.maskBits = ScrewPuzzleGame.kBoltHoleCategory;
+      ..filter.maskBits = ScrewPuzzleGame.kBoltHoleCategory; // ONLY collide with bolts, not other plates
 
     return world.createBody(bodyDef)..createFixture(fixtureDef);
   }
-  
+
   @override
   void beginContact(Object other, Contact contact) {
     if (other is BoltComponent) {
       final worldManifold = WorldManifold();
       contact.getWorldManifold(worldManifold);
-      
+
       if (worldManifold.points.isNotEmpty) {
         final point = worldManifold.points.first;
-        
+
         // Calculate relative velocity
         final v1 = body.linearVelocity;
         final v2 = other.body.linearVelocity;
         final relativeVelocity = (v1 - v2).length;
-        
+
         // Only spawn sparks on heavy metal collisions
-        if (relativeVelocity > 5.0) {
+        if (relativeVelocity > 12.0) {
+          final impactVolume = (relativeVelocity / 30.0).clamp(0.2, 1.0);
+          gameRef.audio.playPlateCollision(volume: impactVolume);
           showSparks(point);
         }
       }
@@ -107,6 +109,25 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
   @override
   bool containsLocalPoint(Vector2 point) {
     return point.x.abs() <= size.x / 2 && point.y.abs() <= size.y / 2;
+  }
+
+  /// Strict check: Does this plate overlap ANY part of a circle at [worldPos] with [radius]?
+  bool isOverlappingCircle(Vector2 worldPos, double radius) {
+    final localPoint = body.localPoint(worldPos);
+    
+    // Find the closest point on the rectangle to the circle center
+    final halfW = size.x / 2;
+    final halfH = size.y / 2;
+    
+    final closestX = localPoint.x.clamp(-halfW, halfW);
+    final closestY = localPoint.y.clamp(-halfH, halfH);
+    
+    // Calculate distance from closest point to circle center
+    final distanceX = localPoint.x - closestX;
+    final distanceY = localPoint.y - closestY;
+    
+    final distanceSquared = (distanceX * distanceX) + (distanceY * distanceY);
+    return distanceSquared < (radius * radius);
   }
 
   /// AAA Polish - Realistic Metal Spark Particles
@@ -125,7 +146,9 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
             position: contactPoint.clone(),
             child: ComputedParticle(
               renderer: (canvas, particle) {
-                final fade = particle.progress > 0.5 ? (1 - particle.progress) * 2 : 1.0;
+                final fade = particle.progress > 0.5
+                    ? (1 - particle.progress) * 2
+                    : 1.0;
                 final paint = Paint()
                   ..color = Colors.orangeAccent.withOpacity(fade)
                   ..strokeWidth = 0.15
@@ -134,10 +157,10 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
                 // Draw streaks instead of circles for fast sparks
                 final dir = Vector2(cos(angle), sin(angle)) * 0.6;
                 canvas.drawLine(Offset.zero, Offset(dir.x, dir.y), paint);
-              }
+              },
             ),
           );
-        }
+        },
       ),
     );
     parent?.add(particle);
@@ -161,104 +184,84 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
     // --- START PUNCH-OUT RENDERING ---
     canvas.saveLayer(rect, Paint());
 
-    // 2. AGED COPPER/IRON SURFACE
+    // 2. WEATHERED IRON SURFACE
     final paint = Paint()
       ..shader = LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: const [
-          Color(0xFFB87333), // Copper Base
-          Color(0xFF8B4513), // Bronze Shadow
-          Color(0xFF4E733E), // Verdigris
-          Color(0xFFB87333),
+          Color(0xFF424242), // Dark Iron
+          Color(0xFF616161), // Mid Iron
+          Color(0xFF212121), // Deep Iron
         ],
-        stops: const [0.0, 0.4, 0.8, 1.0],
+        stops: const [0.0, 0.5, 1.0],
       ).createShader(rect);
 
     canvas.drawRect(rect, paint);
-    
-    // 3. DYNAMIC METALLIC GLINT (Shine sweeps across periodically)
-    final glintProgress = (_glintTimer % 3.0) / 3.0; 
-    final glintX = -size.x + (glintProgress * size.x * 3);
-    
+
+    // 4. METALLIC WEAR (Scratches & Grain)
+    final scratchPaint = Paint()
+      ..color = Colors.white.withOpacity(0.1)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.02;
+    canvas.drawLine(
+      Offset(-size.x / 2.2, size.y / 4),
+      Offset(size.x / 4, -size.y / 3),
+      scratchPaint,
+    );
+
+    // 5. BEVELED EDGES (Aged Metal)
+    final borderPaint = Paint()
+      ..color = Colors.black.withOpacity(0.3)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.06;
+    canvas.drawRect(rect, borderPaint);
+
+    // 6. DYNAMIC GLINT (Dirty / Oily shine)
+    final glintProgress = (_glintTimer % 5.0) / 5.0;
+    final glintX = -size.x + (glintProgress * size.x * 6);
     final glintPaint = Paint()
       ..shader = LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
           Colors.white.withOpacity(0.0),
-          Colors.white.withOpacity(0.5),
+          Colors.white.withOpacity(0.15),
           Colors.white.withOpacity(0.0),
         ],
-        stops: const [0.0, 0.5, 1.0],
-      ).createShader(Rect.fromLTWH(glintX, -size.y, size.x * 0.8, size.y * 2))
+      ).createShader(Rect.fromLTWH(glintX, -size.y, size.x * 0.4, size.y * 2))
       ..blendMode = BlendMode.screen;
-      
     canvas.drawRect(rect, glintPaint);
 
-    // 4. SURFACE SCRATCHES
-    final scratchPaint = Paint()
-      ..color = Colors.white.withOpacity(0.15)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.03;
-    canvas.drawLine(Offset(-size.x / 2, -size.y / 2), Offset(size.x / 2, size.y / 2), scratchPaint);
-    canvas.drawLine(Offset(size.x / 4, -size.y / 2), Offset(-size.x / 4, size.y / 2), scratchPaint);
-
-
-    // 5. ERROR FLASH
-    if (_errorFlashTimer > 0) {
-      final flashPaint = Paint()
-        ..color = Colors.red.withOpacity(
-          0.3 * (sin(_errorFlashTimer * 20) * 0.5 + 0.5),
-        );
-      canvas.drawRect(rect, flashPaint);
-    }
-
-    // 6. BEVELED EDGES
-    final borderPaint = Paint()
-      ..color = Colors.white.withOpacity(0.2)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.05;
-    canvas.drawRect(rect, borderPaint);
-
-    // 7. THE PUNCH (Drilled holes in the metal)
+    // 7. THE PUNCH (Drilled holes)
     final punchPaint = Paint()
       ..blendMode = BlendMode.dstOut
       ..style = PaintingStyle.fill;
+    
+    // Hole Rim Paint (Inner shadow/rim)
+    final rimPaint = Paint()
+      ..color = Colors.white.withOpacity(0.1)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.05;
 
     for (final localPos in _localHoles) {
-      canvas.drawCircle(Offset(localPos.x, localPos.y), 0.5, punchPaint);
+      final offset = Offset(localPos.x, localPos.y);
+      canvas.drawCircle(offset, 0.40, punchPaint);
     }
-
-    // Restore layer to composite back with transparency
     canvas.restore();
 
-    // 8. BRASS RIVETS & DEPTH
-    final rivetRadius = size.x * 0.04;
-    final inset = rivetRadius * 2.5;
-
-    final brassRivetPaint = Paint()
-      ..shader = RadialGradient(
-        colors: [const Color(0xFFFFD700), const Color(0xFFB8860B)],
-      ).createShader(Rect.fromCircle(center: Offset.zero, radius: rivetRadius));
-
-    final rivetShadowPaint = Paint()
-      ..color = Colors.black.withOpacity(0.6)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 0.05);
-
-    final offsets = [
-      Offset(-size.x / 2 + inset, -size.y / 2 + inset),
-      Offset(size.x / 2 - inset, -size.y / 2 + inset),
-      Offset(-size.x / 2 + inset, size.y / 2 - inset),
-      Offset(size.x / 2 - inset, size.y / 2 - inset),
-    ];
-
-    for (final offset in offsets) {
-      canvas.drawCircle(offset + const Offset(0.05, 0.05), rivetRadius, rivetShadowPaint);
-      canvas.save();
-      canvas.translate(offset.dx, offset.dy);
-      canvas.drawCircle(Offset.zero, rivetRadius, brassRivetPaint);
-      canvas.restore();
+    // 8. HOLE RIMS (Drawn after restore to be visible)
+    for (final localPos in _localHoles) {
+      final offset = Offset(localPos.x, localPos.y);
+      canvas.drawCircle(offset, 0.40, rimPaint);
+      
+      // Subtle depth shadow inside the hole
+      final depthPaint = Paint()
+        ..color = Colors.black.withOpacity(0.5)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.1;
+      canvas.drawCircle(offset, 0.38, depthPaint);
     }
+
   }
 }
