@@ -12,6 +12,7 @@ class HoleComponent extends BodyComponent<ScrewPuzzleGame>
   final double radius;
   final Vector2 initialPosition;
   bool isOccupied;
+  bool isAdLocked;
   bool isTargetHighlight = false;
   double _pulseTime = 0.0;
 
@@ -25,6 +26,7 @@ class HoleComponent extends BodyComponent<ScrewPuzzleGame>
     required this.initialPosition,
     this.radius = 0.40,
     this.isOccupied = false,
+    this.isAdLocked = false,
   }) : super(renderBody: false);
 
   @override
@@ -87,7 +89,7 @@ class HoleComponent extends BodyComponent<ScrewPuzzleGame>
     canvas.drawCircle(Offset.zero, radius, rimPaint);
 
     // 4. Target Highlight Glow (Only when active and not occupied)
-    if (isTargetHighlight && !isOccupied) {
+    if (isTargetHighlight && !isOccupied && !isAdLocked) {
       final pulseAlpha = ((math.sin(_pulseTime) + 1.0) / 2.0 * 150).toInt();
       final glowPaint = Paint()
         ..color = Color.fromARGB(pulseAlpha, 255, 255, 255)
@@ -101,6 +103,54 @@ class HoleComponent extends BodyComponent<ScrewPuzzleGame>
         ..style = PaintingStyle.stroke
         ..strokeWidth = 0.05;
       canvas.drawCircle(Offset.zero, radius * 0.9, strokeGlowPaint);
+    }
+
+    // 5. Ad Lock Overlay (3D Style)
+    if (isAdLocked) {
+      // Background Dim
+      final lockPaint = Paint()..color = Colors.black.withOpacity(0.65);
+      canvas.drawCircle(Offset.zero, radius, lockPaint);
+
+      // 3D Button Base (Shadow)
+      final btnShadow = Paint()..color = Colors.black.withOpacity(0.5);
+      canvas.drawCircle(const Offset(0.05, 0.08), radius * 0.7, btnShadow);
+
+      // 3D Button Base (Main)
+      final btnPaint = Paint()
+        ..shader = const RadialGradient(
+          colors: [Color(0xFFFFD54F), Color(0xFFF57F17)],
+        ).createShader(Rect.fromCircle(center: Offset.zero, radius: radius * 0.7));
+      canvas.drawCircle(Offset.zero, radius * 0.7, btnPaint);
+
+      // Glassy Highlight
+      final glassPaint = Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Colors.white.withOpacity(0.5), Colors.white.withOpacity(0.0)],
+        ).createShader(Rect.fromCircle(center: Offset.zero, radius: radius * 0.7));
+      canvas.drawCircle(Offset.zero, radius * 0.7, glassPaint);
+
+      // Play Icon (Inside)
+      final iconPainter = TextPainter(
+        text: TextSpan(
+          text: String.fromCharCode(Icons.play_arrow_rounded.codePoint),
+          style: TextStyle(
+            fontSize: radius * 1.2,
+            fontFamily: Icons.play_arrow_rounded.fontFamily,
+            package: Icons.play_arrow_rounded.fontPackage,
+            color: Colors.white,
+            shadows: const [
+              Shadow(color: Colors.black26, offset: Offset(1, 1), blurRadius: 1),
+            ],
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      iconPainter.paint(
+        canvas,
+        Offset(-iconPainter.width / 2, -iconPainter.height / 2),
+      );
     }
 
     canvas.restore();

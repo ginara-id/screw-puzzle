@@ -50,6 +50,7 @@ class LevelManager {
               (holeData['y'] as num).toDouble(),
             ),
             isOccupied: false,
+            isAdLocked: holeData['isAdLocked'] as bool? ?? false,
           );
           game.addHole(hole);
           await game.world.add(hole);
@@ -64,7 +65,10 @@ class LevelManager {
             (boltData['x'] as num).toDouble(),
             (boltData['y'] as num).toDouble(),
           );
-          final bolt = BoltComponent(initialPosition: pos);
+          final bolt = BoltComponent(
+            initialPosition: pos,
+            isRusty: boltData['isRusty'] as bool? ?? false,
+          );
 
           final hole = allHoles.firstWhere(
             (h) => h.initialPosition.distanceTo(pos) < 0.1,
@@ -102,7 +106,7 @@ class LevelManager {
           // endPadding: gap from hole edge to the 'tips' of the plate.
           // sidePadding: gap from hole edge to the 'sides' (thickness) of the plate.
           const holeRadius = 0.35;
-          const endPadding = 0.45; 
+          const endPadding = 0.45;
           const sidePadding = 0.10;
 
           double minWidth, minHeight;
@@ -123,12 +127,28 @@ class LevelManager {
           final scaledWidth = (pDataMap['width'] as num).toDouble() * 0.70;
           final scaledHeight = (pDataMap['height'] as num).toDouble() * 0.70;
 
+          double finalWidth = scaledWidth.clamp(minWidth, double.infinity);
+          double finalHeight = scaledHeight.clamp(minHeight, double.infinity);
+
+          final shapeStr = pDataMap['shape'] as String? ?? (pDataMap['isCircle'] == true ? 'circle' : 'box');
+          PlateShape shapeType;
+          switch (shapeStr) {
+            case 'circle': shapeType = PlateShape.circle; break;
+            case 'triangle': shapeType = PlateShape.triangle; break;
+            default: shapeType = PlateShape.box;
+          }
+
+          // Fix: If it's a circle or triangle, width and height should be equal for symmetry if not specified
+          if (shapeType == PlateShape.circle || shapeType == PlateShape.triangle) {
+            final side = finalWidth > finalHeight ? finalWidth : finalHeight;
+            finalWidth = side;
+            finalHeight = side;
+          }
+
           final plate = PlateComponent(
-            size: Vector2(
-              scaledWidth.clamp(minWidth, double.infinity),
-              scaledHeight.clamp(minHeight, double.infinity),
-            ),
+            size: Vector2(finalWidth, finalHeight),
             initialPosition: platePos,
+            shapeType: shapeType,
           );
 
           await game.world.add(plate);

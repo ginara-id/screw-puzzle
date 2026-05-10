@@ -38,6 +38,8 @@ dependencies:
   flame_forge2d: ^0.19.2
   flame_audio: ^2.12.1
   shared_preferences: ^2.5.2
+  google_mobile_ads: ^5.1.0
+  sensors_plus: ^6.1.1
 
 dev_dependencies:
   flutter_test:

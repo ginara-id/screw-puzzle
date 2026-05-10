@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 import 'package:flame/effects.dart';
 import 'package:flame/components.dart';
+import 'package:screw_puzzle/utils/ad_service.dart';
 import '../game/screw_game.dart';
 import '../components/industrial_transition.dart';
 
@@ -27,23 +28,28 @@ class WinMenu extends StatelessWidget {
             duration: const Duration(milliseconds: 600),
             curve: Curves.easeOutBack,
             builder: (context, value, child) {
-              return Transform.scale(
-                scale: value,
-                child: child,
-              );
+              return Transform.scale(scale: value, child: child);
             },
             child: Container(
               width: 340,
               padding: const EdgeInsets.all(2),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFFB8860B), Color(0xFF3E2723), Color(0xFFB8860B)],
+                  colors: [
+                    Color(0xFFB8860B),
+                    Color(0xFF3E2723),
+                    Color(0xFFB8860B),
+                  ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.8), blurRadius: 40, spreadRadius: 10),
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.8),
+                    blurRadius: 40,
+                    spreadRadius: 10,
+                  ),
                 ],
               ),
               child: Container(
@@ -59,7 +65,11 @@ class WinMenu extends StatelessWidget {
                     Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.verified_user_rounded, color: Color(0xFFFF9800), size: 80),
+                        const Icon(
+                          Icons.verified_user_rounded,
+                          color: Color(0xFFFF9800),
+                          size: 80,
+                        ),
                         const SizedBox(height: 24),
                         const Text(
                           'SYSTEM CLEARED',
@@ -106,7 +116,11 @@ class WinMenu extends StatelessWidget {
     );
   }
 
-  Widget _buildMenuButton({required String label, required IconData icon, required VoidCallback onPressed}) {
+  Widget _buildMenuButton({
+    required String label,
+    required IconData icon,
+    required VoidCallback onPressed,
+  }) {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
@@ -126,7 +140,12 @@ class WinMenu extends StatelessWidget {
           children: [
             Text(
               label,
-              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 2, fontFamily: 'Courier'),
+              style: const TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 16,
+                letterSpacing: 2,
+                fontFamily: 'Courier',
+              ),
             ),
             const SizedBox(width: 10),
             Icon(icon, size: 20),
@@ -163,7 +182,11 @@ class _RivetWidget extends StatelessWidget {
         shape: BoxShape.circle,
         border: Border.all(color: Colors.black, width: 2),
         boxShadow: const [
-          BoxShadow(color: Colors.white10, blurRadius: 1, offset: Offset(-1, -1)),
+          BoxShadow(
+            color: Colors.white10,
+            blurRadius: 1,
+            offset: Offset(-1, -1),
+          ),
         ],
       ),
     );
@@ -190,23 +213,28 @@ class GameOverMenu extends StatelessWidget {
             duration: const Duration(milliseconds: 600),
             curve: Curves.bounceOut,
             builder: (context, value, child) {
-              return Transform.scale(
-                scale: value,
-                child: child,
-              );
+              return Transform.scale(scale: value, child: child);
             },
             child: Container(
               width: 340,
               padding: const EdgeInsets.all(2),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Colors.redAccent, Color(0xFF310000), Colors.redAccent],
+                  colors: [
+                    Colors.redAccent,
+                    Color(0xFF310000),
+                    Colors.redAccent,
+                  ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.8), blurRadius: 40, spreadRadius: 10),
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.8),
+                    blurRadius: 40,
+                    spreadRadius: 10,
+                  ),
                 ],
               ),
               child: Container(
@@ -222,7 +250,11 @@ class GameOverMenu extends StatelessWidget {
                     Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.report_problem_rounded, color: Colors.redAccent, size: 80),
+                        const Icon(
+                          Icons.report_problem_rounded,
+                          color: Colors.redAccent,
+                          size: 80,
+                        ),
                         const SizedBox(height: 24),
                         const Text(
                           'SYSTEM JAMMED',
@@ -269,7 +301,11 @@ class GameOverMenu extends StatelessWidget {
     );
   }
 
-  Widget _buildMenuButton({required String label, required IconData icon, required VoidCallback onPressed}) {
+  Widget _buildMenuButton({
+    required String label,
+    required IconData icon,
+    required VoidCallback onPressed,
+  }) {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
@@ -289,7 +325,12 @@ class GameOverMenu extends StatelessWidget {
           children: [
             Text(
               label,
-              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 2, fontFamily: 'Courier'),
+              style: const TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 16,
+                letterSpacing: 2,
+                fontFamily: 'Courier',
+              ),
             ),
             const SizedBox(width: 10),
             Icon(icon, size: 20),
@@ -323,251 +364,283 @@ class HUDMenu extends StatefulWidget {
 }
 
 class _HUDMenuState extends State<HUDMenu> with SingleTickerProviderStateMixin {
-  late AnimationController _hudAnimController;
+  late AnimationController _pulseController;
 
   @override
   void initState() {
     super.initState();
-    _hudAnimController = AnimationController(
+    _pulseController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 3),
-    )..repeat();
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
   }
 
   @override
   void dispose() {
-    _hudAnimController.dispose();
+    _pulseController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox.expand(
-      child: Stack(
-        children: [
-          // Top HUD - Keep in SafeArea
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Level Information (LEFT) - Glass Plate
-                  _buildGlassPanel(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'FACILITY SECTOR',
-                          style: TextStyle(
-                            color: const Color(0xFFFF9800).withOpacity(0.5),
-                            fontSize: 8,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 2,
-                            fontFamily: 'monospace',
-                          ),
-                        ),
-                        Text(
-                          'SEC-${widget.game.currentLevel.toString().padLeft(2, '0')}',
-                          style: const TextStyle(
-                            color: Color(0xFFFF9800),
-                            fontSize: 22,
-                            fontWeight: FontWeight.w900,
-                            fontFamily: 'Courier',
-                            letterSpacing: 2,
-                            shadows: [Shadow(color: Color(0xFFFF9800), blurRadius: 8)],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+    return AnimatedBuilder(
+      animation: _pulseController,
+      builder: (context, child) {
+        final time = widget.game.remainingTime;
+        final isLowTime = time < 10 && time > 0;
+        final minutes = (time / 60).floor().toString().padLeft(2, '0');
+        final seconds = (time % 60).floor().toString().padLeft(2, '0');
 
-                  // Controls (RIGHT)
-                  Row(
+        return SizedBox.expand(
+          child: Stack(
+            children: [
+              // --- TOP LEFT: LEVEL INDICATOR (Floating Glass Pill) ---
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 16,
+                left: 16,
+                child: _buildGlassContainer(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  borderRadius: BorderRadius.circular(25),
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _buildHUDButton(
+                      // Cyan LED Indicator
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF00E5FF),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF00E5FF).withOpacity(0.8), 
+                              blurRadius: 10,
+                              spreadRadius: 2,
+                            )
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'FACILITY SECTOR',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.5),
+                              fontSize: 9,
+                              letterSpacing: 2.5,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                          Text(
+                            'SEC-${widget.game.currentLevel.toString().padLeft(2, '0')}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 2.0,
+                              fontFamily: 'Courier',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // --- TOP RIGHT: CONTROLS (Floating Glass Pill) ---
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 16,
+                right: 16,
+                child: _buildGlassContainer(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                  borderRadius: BorderRadius.circular(25),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildIconButton(
                         icon: Icons.home_rounded,
                         onPressed: () {
                           widget.game.overlays.remove('HUD');
                           widget.game.overlays.add('MainMenu');
                         },
                       ),
-                      const SizedBox(width: 12),
-                      _buildHUDButton(
+                      Container(
+                        width: 1, 
+                        height: 20, 
+                        color: Colors.white.withOpacity(0.2), 
+                        margin: const EdgeInsets.symmetric(horizontal: 4)
+                      ),
+                      _buildIconButton(
                         icon: Icons.refresh_rounded,
                         onPressed: () => widget.game.resetLevel(),
                       ),
                     ],
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
 
-          // Bottom Booster Bar - Move OUTSIDE SafeArea for absolute bottom positioning
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 30, // Absolute bottom positioning
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.5),
+              // --- BOTTOM: MAIN DOCK (Floating Glass Panel) ---
+              Positioned(
+                bottom: 35,
+                left: 16,
+                right: 16,
+                child: _buildGlassContainer(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                   borderRadius: BorderRadius.circular(35),
-                  border: Border.all(color: const Color(0xFFFF9800).withOpacity(0.3), width: 1.5),
-                  boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.6), blurRadius: 30, spreadRadius: -5),
-                    BoxShadow(color: const Color(0xFFFF9800).withOpacity(0.1), blurRadius: 20, spreadRadius: -10),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildBoosterButton(
-                      icon: Icons.radar_rounded,
-                      label: 'SCAN',
-                      onPressed: () {
-                        widget.game.audio.playBoosterClick();
-                        widget.game.camera.viewfinder.add(
-                          ScaleEffect.by(
-                            Vector2.all(1.05),
-                            EffectController(duration: 0.1, reverseDuration: 0.1),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Boosters
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildBoosterItem(Icons.radar, 'SCAN', const Color(0xFF00E5FF)),
+                          const SizedBox(width: 16),
+                          _buildBoosterItem(Icons.build, 'REMOVE', const Color(0xFFFF9800)),
+                          const SizedBox(width: 16),
+                          _buildBoosterItem(Icons.auto_fix_high, 'CLEAR', const Color(0xFFE040FB)),
+                        ],
+                      ),
+                      
+                      // Elegant Vertical Divider
+                      Container(
+                        width: 1,
+                        height: 45,
+                        margin: const EdgeInsets.symmetric(horizontal: 8),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.white.withOpacity(0.0),
+                              Colors.white.withOpacity(0.3),
+                              Colors.white.withOpacity(0.0),
+                            ],
                           ),
-                        );
-                      },
-                    ),
-                    const SizedBox(width: 32),
-                    _buildBoosterButton(
-                      icon: Icons.build_circle_rounded,
-                      label: 'REMOVE',
-                      onPressed: () {
-                        widget.game.audio.playBoosterClick();
-                        widget.game.camera.viewfinder.add(
-                          MoveEffect.by(
-                            Vector2(2, 0),
-                            EffectController(duration: 0.05, reverseDuration: 0.05, repeatCount: 2),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(width: 32),
-                    _buildBoosterButton(
-                      icon: Icons.auto_fix_high_rounded,
-                      label: 'CLEAR',
-                      onPressed: () {
-                        widget.game.audio.playBoosterClick();
-                        widget.game.camera.viewfinder.add(
-                          MoveEffect.by(
-                            Vector2(0, 5),
-                            EffectController(duration: 0.1, reverseDuration: 0.1),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
+                        ),
+                      ),
+
+                      // High-Tech Timer Display
+                      Expanded(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              '$minutes:$seconds',
+                              style: TextStyle(
+                                color: isLowTime 
+                                  ? (time.floor() % 2 == 0 ? const Color(0xFFFF3333) : Colors.white)
+                                  : Colors.white,
+                                fontSize: 32,
+                                fontWeight: FontWeight.w900,
+                                fontFamily: 'Courier',
+                                shadows: [
+                                  Shadow(
+                                    color: isLowTime ? const Color(0xFFFF3333) : const Color(0xFF00E5FF).withOpacity(0.6), 
+                                    blurRadius: 15
+                                  )
+                                ],
+                              ),
+                            ),
+                            Text(
+                              'TIME REMAINING',
+                              style: TextStyle(
+                                color: const Color(0xFF00E5FF).withOpacity(0.6), 
+                                fontSize: 8,
+                                fontFamily: 'monospace',
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      }
     );
   }
 
-  Widget _buildBoosterButton({required IconData icon, required String label, required VoidCallback onPressed}) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _buildHUDButton(icon: icon, onPressed: onPressed),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            color: const Color(0xFFFF9800).withOpacity(0.7),
-            fontSize: 8,
-            fontWeight: FontWeight.bold,
-            fontFamily: 'monospace',
-            letterSpacing: 1,
+  /// Core Glassmorphism Container Generator
+  Widget _buildGlassContainer({required Widget child, required EdgeInsets padding, required BorderRadius borderRadius}) {
+    return ClipRRect(
+      borderRadius: borderRadius,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5), // Optimized blur for better FPS
+        child: Container(
+          padding: padding,
+          decoration: BoxDecoration(
+            color: const Color(0xFF0A1128).withOpacity(0.45), // Deep space blue tint
+            borderRadius: borderRadius,
+            border: Border.all(color: Colors.white.withOpacity(0.15), width: 1.0), // Hairline highlight
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 30, spreadRadius: -5),
+              BoxShadow(color: const Color(0xFF00E5FF).withOpacity(0.05), blurRadius: 20, spreadRadius: 5), // Cyan ambient glow
+            ],
           ),
+          child: child,
         ),
-      ],
-    );
-  }
-
-  Widget _buildGlassPanel({required Widget child}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: const Color(0xFFFF9800).withOpacity(0.2), width: 1),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 10),
-        ],
-      ),
-      child: Stack(
-        children: [
-          // Corner Brackets
-          const Positioned(left: 0, top: 0, child: _CornerBracket(rotation: 0)),
-          const Positioned(right: 0, top: 0, child: _CornerBracket(rotation: 1)),
-          const Positioned(left: 0, bottom: 0, child: _CornerBracket(rotation: 3)),
-          const Positioned(right: 0, bottom: 0, child: _CornerBracket(rotation: 2)),
-          
-          // Scanning Line
-          Positioned.fill(
-            child: AnimatedBuilder(
-              animation: _hudAnimController,
-              builder: (context, _) {
-                return CustomPaint(
-                  painter: _HUDScannerPainter(progress: _hudAnimController.value),
-                );
-              },
-            ),
-          ),
-          
-          Padding(
-            padding: const EdgeInsets.all(4.0),
-            child: child,
-          ),
-        ],
       ),
     );
   }
 
-  Widget _buildHUDButton({required IconData icon, required VoidCallback onPressed}) {
+  Widget _buildIconButton({required IconData icon, required VoidCallback onPressed}) {
+    return IconButton(
+      onPressed: onPressed,
+      icon: Icon(icon, color: Colors.white.withOpacity(0.9), size: 24),
+      splashColor: const Color(0xFF00E5FF).withOpacity(0.3),
+      highlightColor: Colors.transparent,
+      constraints: const BoxConstraints(),
+      padding: const EdgeInsets.all(10),
+    );
+  }
+
+  Widget _buildBoosterItem(IconData icon, String label, Color accentColor) {
     return GestureDetector(
-      onTap: onPressed,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.3),
-          borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: const Color(0xFFFF9800).withOpacity(0.2), width: 1),
-        ),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Icon(icon, color: const Color(0xFFFF9800), size: 24),
-            // Tiny glow
-            Positioned.fill(
-              child: Container(
-                decoration: BoxDecoration(
-                  boxShadow: [
-                    BoxShadow(color: const Color(0xFFFF9800).withOpacity(0.05), blurRadius: 5, spreadRadius: 1),
-                  ],
-                ),
-              ),
+      onTap: () => widget.game.audio.playBoosterClick(),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.4),
+              shape: BoxShape.circle,
+              border: Border.all(color: accentColor.withOpacity(0.4), width: 1.5),
+              boxShadow: [
+                BoxShadow(color: accentColor.withOpacity(0.2), blurRadius: 15),
+              ],
             ),
-          ],
-        ),
+            child: Icon(icon, color: Colors.white, size: 22),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.6),
+              fontSize: 9,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.5,
+              fontFamily: 'monospace',
+            ),
+          )
+        ],
       ),
     );
   }
 }
+
 
 class _CornerBracket extends StatelessWidget {
   final int rotation;
@@ -598,24 +671,31 @@ class _HUDScannerPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          Colors.transparent,
-          const Color(0xFFFF9800).withOpacity(0.1),
-          const Color(0xFFFF9800).withOpacity(0.3),
-          const Color(0xFFFF9800).withOpacity(0.1),
-          Colors.transparent,
-        ],
-        stops: const [0.0, 0.45, 0.5, 0.55, 1.0],
-      ).createShader(Rect.fromLTWH(0, (progress * size.height) - 10, size.width, 20));
+      ..shader =
+          LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.transparent,
+              const Color(0xFFFF9800).withOpacity(0.1),
+              const Color(0xFFFF9800).withOpacity(0.3),
+              const Color(0xFFFF9800).withOpacity(0.1),
+              Colors.transparent,
+            ],
+            stops: const [0.0, 0.45, 0.5, 0.55, 1.0],
+          ).createShader(
+            Rect.fromLTWH(0, (progress * size.height) - 10, size.width, 20),
+          );
 
-    canvas.drawRect(Rect.fromLTWH(0, (progress * size.height) - 10, size.width, 20), paint);
+    canvas.drawRect(
+      Rect.fromLTWH(0, (progress * size.height) - 10, size.width, 20),
+      paint,
+    );
   }
 
   @override
-  bool shouldRepaint(covariant _HUDScannerPainter oldDelegate) => oldDelegate.progress != progress;
+  bool shouldRepaint(covariant _HUDScannerPainter oldDelegate) =>
+      oldDelegate.progress != progress;
 }
 
 class MainMenu extends StatefulWidget {
@@ -626,7 +706,8 @@ class MainMenu extends StatefulWidget {
   State<MainMenu> createState() => _MainMenuState();
 }
 
-class _MainMenuState extends State<MainMenu> with SingleTickerProviderStateMixin {
+class _MainMenuState extends State<MainMenu>
+    with SingleTickerProviderStateMixin {
   late AnimationController _animController;
 
   @override
@@ -650,11 +731,14 @@ class _MainMenuState extends State<MainMenu> with SingleTickerProviderStateMixin
       backgroundColor: Colors.transparent,
       body: Container(
         decoration: const BoxDecoration(
-          color: Color(0xFF0A0C10),
-          gradient: RadialGradient(
-            center: Alignment.center,
-            radius: 1.2,
-            colors: [Color(0xFF161B22), Color(0xFF050608)],
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF0F171E), // Near Black
+              Color(0xFF1C2833), // Deep Charcoal
+              Color(0xFF151922), // Dark Navy/Charcoal
+            ],
           ),
         ),
         child: Stack(
@@ -684,73 +768,100 @@ class _MainMenuState extends State<MainMenu> with SingleTickerProviderStateMixin
   }
 
   Widget _buildPremiumTopBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
-      margin: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.03),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.08), width: 1),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 10)),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFF9800).withOpacity(0.1),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFFF9800).withOpacity(0.3), width: 1.5),
-                ),
-                child: const Icon(Icons.precision_manufacturing_rounded, color: Color(0xFFFF9800), size: 20),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5), // Optimized blur for better FPS
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
+          margin: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0A1128).withOpacity(0.45), // Deep space blue tint
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.white.withOpacity(0.15), width: 1.0),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 30,
+                spreadRadius: -5,
               ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'CURRENT SECTOR',
-                    style: TextStyle(
-                      color: const Color(0xFFFF9800).withOpacity(0.6),
-                      fontSize: 9,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1,
-                      fontFamily: 'monospace',
-                    ),
-                  ),
-                  Text(
-                    'SCT-${widget.game.currentLevel.toString().padLeft(2, '0')}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 1,
-                      fontFamily: 'Courier',
-                      shadows: [Shadow(color: Color(0xFFFF9800), blurRadius: 10)],
-                    ),
-                  ),
-                ],
+              BoxShadow(
+                color: const Color(0xFF00E5FF).withOpacity(0.05), // Cyan ambient glow
+                blurRadius: 20,
+                spreadRadius: 5,
               ),
             ],
           ),
-          _buildGlassIconButton(
-            icon: Icons.settings_outlined,
-            onPressed: () {},
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00E5FF).withOpacity(0.1),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: const Color(0xFF00E5FF).withOpacity(0.3),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.precision_manufacturing_rounded,
+                      color: Color(0xFF00E5FF),
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'CURRENT SECTOR',
+                        style: TextStyle(
+                          color: const Color(0xFF00E5FF).withOpacity(0.6),
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                      Text(
+                        'SCT-${widget.game.currentLevel.toString().padLeft(2, '0')}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1,
+                          fontFamily: 'Courier',
+                          shadows: [
+                            Shadow(color: Color(0xFF00E5FF), blurRadius: 10),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              _buildGlassIconButton(
+                icon: Icons.settings_outlined,
+                onPressed: () {},
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildGlassIconButton({required IconData icon, required VoidCallback onPressed}) {
+  Widget _buildGlassIconButton({
+    required IconData icon,
+    required VoidCallback onPressed,
+  }) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.05),
@@ -759,7 +870,7 @@ class _MainMenuState extends State<MainMenu> with SingleTickerProviderStateMixin
       ),
       child: IconButton(
         onPressed: onPressed,
-        icon: Icon(icon, color: const Color(0xFFFF9800), size: 28),
+        icon: Icon(icon, color: const Color(0xFF00E5FF), size: 28), // Updated to Cyan
         padding: const EdgeInsets.all(12),
       ),
     );
@@ -773,7 +884,7 @@ class _MainMenuState extends State<MainMenu> with SingleTickerProviderStateMixin
           return CustomPaint(
             painter: _ModernGridPainter(
               animValue: _animController.value,
-              gridColor: const Color(0xFFFF9800).withOpacity(0.05),
+              gridColor: const Color(0xFF00E5FF).withOpacity(0.05), // Updated to Cyan
             ),
           );
         },
@@ -804,7 +915,7 @@ class _MainMenuState extends State<MainMenu> with SingleTickerProviderStateMixin
         final level = index + 1;
         final isUnlocked = level <= widget.game.currentLevel;
         final isCurrent = level == widget.game.currentLevel;
-        
+
         return AnimatedBuilder(
           animation: _animController,
           builder: (context, child) {
@@ -852,10 +963,7 @@ class _MainMenuState extends State<MainMenu> with SingleTickerProviderStateMixin
           duration: const Duration(seconds: 1),
           curve: Curves.elasticOut,
           builder: (context, value, child) {
-            return Transform.scale(
-              scale: value,
-              child: child,
-            );
+            return Transform.scale(scale: value, child: child);
           },
           child: _ModernPlayButton(
             level: widget.game.currentLevel,
@@ -863,10 +971,12 @@ class _MainMenuState extends State<MainMenu> with SingleTickerProviderStateMixin
               widget.game.resetLevel();
               widget.game.overlays.remove('MainMenu');
               widget.game.overlays.add('HUD');
-              widget.game.camera.viewport.add(IndustrialTransitionComponent(
-                mode: TransitionMode.openOnly,
-                onHalfway: () async {},
-              ));
+              widget.game.camera.viewport.add(
+                IndustrialTransitionComponent(
+                  mode: TransitionMode.openOnly,
+                  onHalfway: () async {},
+                ),
+              );
             },
           ),
         ),
@@ -881,32 +991,37 @@ class _ParticlePainter extends CustomPainter {
   final math.Random random = math.Random(1234);
 
   _ParticlePainter({required this.animValue})
-      : particles = List.generate(30, (i) {
-          final r = math.Random(i);
-          return Offset(r.nextDouble(), r.nextDouble());
-        });
+    : particles = List.generate(30, (i) {
+        final r = math.Random(i);
+        return Offset(r.nextDouble(), r.nextDouble());
+      });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = const Color(0xFFFF9800).withOpacity(0.15);
+    final paint = Paint()..color = const Color(0xFF00E5FF).withOpacity(0.15); // Updated to Cyan
 
     for (var i = 0; i < particles.length; i++) {
       final p = particles[i];
       final yOffset = (animValue * 0.2 + p.dy) % 1.0;
       final xOffset = p.dx + math.sin(animValue * math.pi * 2 + i) * 0.01;
-      
+
       final pos = Offset(xOffset * size.width, yOffset * size.height);
       final radius = 1.0 + math.sin(animValue * math.pi * 2 + i) * 1.0;
-      
+
       canvas.drawCircle(pos, radius, paint);
-      
+
       // Subtle glow
-      canvas.drawCircle(pos, radius * 3, Paint()..color = paint.color.withOpacity(0.05));
+      canvas.drawCircle(
+        pos,
+        radius * 3,
+        Paint()..color = paint.color.withOpacity(0.05),
+      );
     }
   }
 
   @override
-  bool shouldRepaint(covariant _ParticlePainter oldDelegate) => oldDelegate.animValue != animValue;
+  bool shouldRepaint(covariant _ParticlePainter oldDelegate) =>
+      oldDelegate.animValue != animValue;
 }
 
 class _ModernGridPainter extends CustomPainter {
@@ -936,21 +1051,49 @@ class _ModernGridPainter extends CustomPainter {
     final secondaryPaint = Paint()
       ..color = gridColor.withOpacity(gridColor.opacity * 2)
       ..strokeWidth = 1.5;
-    
+
     for (double i = 0; i < size.width; i += spacing * 4) {
       canvas.drawLine(Offset(i, 0), Offset(i, size.height), secondaryPaint);
     }
-    for (double i = (offset * 4) % (spacing * 4); i < size.height; i += spacing * 4) {
+    for (
+      double i = (offset * 4) % (spacing * 4);
+      i < size.height;
+      i += spacing * 4
+    ) {
       canvas.drawLine(Offset(0, i), Offset(size.width, i), secondaryPaint);
     }
-    
+
     // Add background gears
-    _drawGear(canvas, const Offset(50, 100), 80, animValue * 0.5, gridColor.withOpacity(0.08));
-    _drawGear(canvas, Offset(size.width - 40, size.height * 0.4), 120, -animValue * 0.3, gridColor.withOpacity(0.06));
-    _drawGear(canvas, Offset(80, size.height * 0.7), 60, animValue * 0.8, gridColor.withOpacity(0.05));
+    _drawGear(
+      canvas,
+      const Offset(50, 100),
+      80,
+      animValue * 0.5,
+      gridColor.withOpacity(0.08),
+    );
+    _drawGear(
+      canvas,
+      Offset(size.width - 40, size.height * 0.4),
+      120,
+      -animValue * 0.3,
+      gridColor.withOpacity(0.06),
+    );
+    _drawGear(
+      canvas,
+      Offset(80, size.height * 0.7),
+      60,
+      animValue * 0.8,
+      gridColor.withOpacity(0.05),
+    );
   }
 
-  void _drawGear(Canvas canvas, Offset center, double radius, double rotation, Color color) {
+  void _drawGear(
+    Canvas canvas,
+    Offset center,
+    double radius,
+    double rotation,
+    Color color,
+  ) {
     final paint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
@@ -962,23 +1105,27 @@ class _ModernGridPainter extends CustomPainter {
 
     // Inner circle
     canvas.drawCircle(Offset.zero, radius * 0.4, paint);
-    
+
     // Teeth
     const teethCount = 12;
     for (var i = 0; i < teethCount; i++) {
       final angle = (i * 2 * math.pi) / teethCount;
       canvas.save();
       canvas.rotate(angle);
-      canvas.drawRect(Rect.fromLTWH(radius - 5, -radius * 0.1, 15, radius * 0.2), paint);
+      canvas.drawRect(
+        Rect.fromLTWH(radius - 5, -radius * 0.1, 15, radius * 0.2),
+        paint,
+      );
       canvas.restore();
     }
-    
+
     canvas.drawCircle(Offset.zero, radius, paint);
     canvas.restore();
   }
 
   @override
-  bool shouldRepaint(covariant _ModernGridPainter oldDelegate) => oldDelegate.animValue != animValue;
+  bool shouldRepaint(covariant _ModernGridPainter oldDelegate) =>
+      oldDelegate.animValue != animValue;
 }
 
 class _ModernJourneyNode extends StatelessWidget {
@@ -1002,7 +1149,8 @@ class _ModernJourneyNode extends StatelessWidget {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final dx = screenWidth / 2 + (screenWidth * 0.25 * math.sin(index * 1.1));
-    final nextDx = screenWidth / 2 + (screenWidth * 0.25 * math.sin((index + 1) * 1.1));
+    final nextDx =
+        screenWidth / 2 + (screenWidth * 0.25 * math.sin((index + 1) * 1.1));
     const cellHeight = 150.0;
 
     return SizedBox(
@@ -1022,7 +1170,7 @@ class _ModernJourneyNode extends StatelessWidget {
                 ),
               ),
             ),
-          
+
           // The Bolt Node
           Positioned(
             left: dx - 40,
@@ -1036,20 +1184,24 @@ class _ModernJourneyNode extends StatelessWidget {
 
   Widget _buildBoltNode() {
     final floatY = isCurrent ? math.sin(animValue * math.pi * 2) * 8 : 0.0;
-    
+
     return Transform.translate(
       offset: Offset(0, floatY),
       child: GestureDetector(
-        onTap: isUnlocked ? () {
-          game.currentLevel = level;
-          game.resetLevel();
-          game.overlays.remove('MainMenu');
-          game.overlays.add('HUD');
-          game.camera.viewport.add(IndustrialTransitionComponent(
-            mode: TransitionMode.openOnly,
-            onHalfway: () async {},
-          ));
-        } : null,
+        onTap: isUnlocked
+            ? () {
+                game.currentLevel = level;
+                game.resetLevel();
+                game.overlays.remove('MainMenu');
+                game.overlays.add('HUD');
+                game.camera.viewport.add(
+                  IndustrialTransitionComponent(
+                    mode: TransitionMode.openOnly,
+                    onHalfway: () async {},
+                  ),
+                );
+              }
+            : null,
         child: Container(
           width: 90,
           height: 90,
@@ -1103,7 +1255,9 @@ class _BoltNodePainter extends CustomPainter {
 
     // 1. Bolt Outer Ring
     final ringPaint = Paint()
-      ..color = isCurrent ? const Color(0xFFFF9800).withOpacity(0.5) : Colors.white.withOpacity(0.1)
+      ..color = isCurrent
+          ? const Color(0xFF00E5FF).withOpacity(0.5) // Updated to Cyan
+          : Colors.white.withOpacity(0.1)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2;
     canvas.drawCircle(center, radius, ringPaint);
@@ -1113,9 +1267,17 @@ class _BoltNodePainter extends CustomPainter {
       ..shader = RadialGradient(
         center: const Alignment(-0.3, -0.3),
         colors: isUnlocked
-            ? (isCurrent 
-                ? [const Color(0xFFFFA726), const Color(0xFFEF6C00), const Color(0xFF2E1500)]
-                : [const Color(0xFF8D8D8D), const Color(0xFF424242), const Color(0xFF1B1B1B)])
+            ? (isCurrent
+                  ? [
+                      const Color(0xFF84FFFF), // Light Cyan
+                      const Color(0xFF00E5FF), // Pure Cyan
+                      const Color(0xFF006064), // Dark Teal
+                    ]
+                  : [
+                      const Color(0xFF8D8D8D),
+                      const Color(0xFF424242),
+                      const Color(0xFF1B1B1B),
+                    ])
             : [const Color(0xFF2A2A2A), const Color(0xFF1A1A1A), Colors.black],
       ).createShader(Rect.fromCircle(center: center, radius: radius - 5));
 
@@ -1127,10 +1289,13 @@ class _BoltNodePainter extends CustomPainter {
       final angle = (i * 60) * math.pi / 180;
       final x = center.dx + (radius * 0.7) * math.cos(angle);
       final y = center.dy + (radius * 0.7) * math.sin(angle);
-      if (i == 0) hexPath.moveTo(x, y); else hexPath.lineTo(x, y);
+      if (i == 0)
+        hexPath.moveTo(x, y);
+      else
+        hexPath.lineTo(x, y);
     }
     hexPath.close();
-    
+
     final hexPaint = Paint()
       ..color = Colors.black.withOpacity(0.3)
       ..style = PaintingStyle.stroke
@@ -1139,13 +1304,17 @@ class _BoltNodePainter extends CustomPainter {
 
     // 4. Philip Slot (Cross)
     final slotPaint = Paint()
-      ..color = isCurrent ? Colors.white.withOpacity(0.9) : (isUnlocked ? Colors.black.withOpacity(0.8) : Colors.black.withOpacity(0.4))
+      ..color = isCurrent
+          ? Colors.white.withOpacity(0.9)
+          : (isUnlocked
+                ? Colors.black.withOpacity(0.8)
+                : Colors.black.withOpacity(0.4))
       ..strokeWidth = radius * 0.12
       ..strokeCap = StrokeCap.round;
 
     final slotLen = radius * 0.4;
     final rotation = isCurrent ? animValue * math.pi * 0.2 : 0.0;
-    
+
     canvas.save();
     canvas.translate(center.dx, center.dy);
     canvas.rotate(rotation);
@@ -1155,20 +1324,32 @@ class _BoltNodePainter extends CustomPainter {
 
     // 5. Level Badge (Terminal Style)
     if (isUnlocked) {
-      final badgeRect = Rect.fromCenter(center: center + Offset(0, radius + 15), width: radius * 1.2, height: 20);
-      
+      final badgeRect = Rect.fromCenter(
+        center: center + Offset(0, radius + 15),
+        width: radius * 1.2,
+        height: 20,
+      );
+
       // Badge Background
       final badgePaint = Paint()
-        ..color = isCurrent ? const Color(0xFFFF9800) : Colors.black.withOpacity(0.5)
+        ..color = isCurrent
+            ? const Color(0xFF00E5FF) // Updated to Cyan
+            : Colors.black.withOpacity(0.5)
         ..style = PaintingStyle.fill;
-      
-      canvas.drawRRect(RRect.fromRectAndRadius(badgeRect, const Radius.circular(4)), badgePaint);
-      
+
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(badgeRect, const Radius.circular(4)),
+        badgePaint,
+      );
+
       if (isCurrent) {
         final badgeGlow = Paint()
-          ..color = const Color(0xFFFF9800).withOpacity(0.3)
+          ..color = const Color(0xFF00E5FF).withOpacity(0.3) // Updated to Cyan
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
-        canvas.drawRRect(RRect.fromRectAndRadius(badgeRect, const Radius.circular(4)), badgeGlow);
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(badgeRect, const Radius.circular(4)),
+          badgeGlow,
+        );
       }
 
       final textPainter = TextPainter(
@@ -1183,7 +1364,14 @@ class _BoltNodePainter extends CustomPainter {
         ),
         textDirection: TextDirection.ltr,
       )..layout();
-      textPainter.paint(canvas, center + Offset(-textPainter.width / 2, radius + 15 - textPainter.height / 2));
+      textPainter.paint(
+        canvas,
+        center +
+            Offset(
+              -textPainter.width / 2,
+              radius + 15 - textPainter.height / 2,
+            ),
+      );
     } else {
       // Locked Icon
       final iconPainter = TextPainter(
@@ -1198,13 +1386,16 @@ class _BoltNodePainter extends CustomPainter {
         ),
         textDirection: TextDirection.ltr,
       )..layout();
-      iconPainter.paint(canvas, center - Offset(iconPainter.width / 2, iconPainter.height / 2));
+      iconPainter.paint(
+        canvas,
+        center - Offset(iconPainter.width / 2, iconPainter.height / 2),
+      );
     }
 
     // 6. Current Scanning Ring
     if (isCurrent) {
       final scanPaint = Paint()
-        ..color = const Color(0xFFFF9800).withOpacity(0.6 * (1.0 - animValue))
+        ..color = const Color(0xFF00E5FF).withOpacity(0.6 * (1.0 - animValue)) // Updated to Cyan
         ..style = PaintingStyle.stroke
         ..strokeWidth = 3;
       canvas.drawCircle(center, radius + 5 + (animValue * 15), scanPaint);
@@ -1212,7 +1403,8 @@ class _BoltNodePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _BoltNodePainter oldDelegate) => oldDelegate.animValue != animValue;
+  bool shouldRepaint(covariant _BoltNodePainter oldDelegate) =>
+      oldDelegate.animValue != animValue;
 }
 
 class _ModernPathPainter extends CustomPainter {
@@ -1232,14 +1424,12 @@ class _ModernPathPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final path = Path()
       ..moveTo(start.dx, start.dy)
-      ..cubicTo(
-        start.dx, start.dy - 60,
-        end.dx, end.dy + 60,
-        end.dx, end.dy,
-      );
+      ..cubicTo(start.dx, start.dy - 60, end.dx, end.dy + 60, end.dx, end.dy);
 
     final basePaint = Paint()
-      ..color = isUnlocked ? const Color(0xFFFF9800).withOpacity(0.15) : Colors.white.withOpacity(0.03)
+      ..color = isUnlocked
+          ? const Color(0xFF00E5FF).withOpacity(0.15) // Updated to Cyan
+          : Colors.white.withOpacity(0.03)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 8
       ..strokeCap = StrokeCap.round;
@@ -1250,9 +1440,9 @@ class _ModernPathPainter extends CustomPainter {
       final energyPaint = Paint()
         ..shader = LinearGradient(
           colors: [
-            const Color(0xFFFF9800).withOpacity(0.0),
-            const Color(0xFFFF9800),
-            const Color(0xFFFF9800).withOpacity(0.0),
+            const Color(0xFF00E5FF).withOpacity(0.0), // Updated to Cyan
+            const Color(0xFF00E5FF),
+            const Color(0xFF00E5FF).withOpacity(0.0),
           ],
           stops: const [0.0, 0.5, 1.0],
         ).createShader(Rect.fromPoints(start, end))
@@ -1267,21 +1457,25 @@ class _ModernPathPainter extends CustomPainter {
       final currentPos = (animValue * totalLen) % totalLen;
 
       final extract = metrics.extractPath(
-        currentPos, 
+        currentPos,
         math.min(currentPos + dashLen, totalLen),
       );
       canvas.drawPath(extract, energyPaint);
-      
+
       // If it wraps around
       if (currentPos + dashLen > totalLen) {
-        final wrapExtract = metrics.extractPath(0, (currentPos + dashLen) - totalLen);
+        final wrapExtract = metrics.extractPath(
+          0,
+          (currentPos + dashLen) - totalLen,
+        );
         canvas.drawPath(wrapExtract, energyPaint);
       }
     }
   }
 
   @override
-  bool shouldRepaint(covariant _ModernPathPainter oldDelegate) => oldDelegate.animValue != animValue;
+  bool shouldRepaint(covariant _ModernPathPainter oldDelegate) =>
+      oldDelegate.animValue != animValue;
 }
 
 class _ModernPlayButton extends StatelessWidget {
@@ -1300,13 +1494,13 @@ class _ModernPlayButton extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(35),
           gradient: const LinearGradient(
-            colors: [Color(0xFFE65100), Color(0xFFFF9800)],
+            colors: [Color(0xFF00B4DB), Color(0xFF00E5FF)], // Modern Cyan Gradient
             begin: Alignment.centerLeft,
             end: Alignment.centerRight,
           ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFFF9800).withOpacity(0.3),
+              color: const Color(0xFF00E5FF).withOpacity(0.3), // Cyan Glow
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -1320,9 +1514,7 @@ class _ModernPlayButton extends StatelessWidget {
               Positioned.fill(
                 child: Opacity(
                   opacity: 0.2,
-                  child: CustomPaint(
-                    painter: _ButtonPatternPainter(),
-                  ),
+                  child: CustomPaint(painter: _ButtonPatternPainter()),
                 ),
               ),
               Center(
@@ -1335,7 +1527,11 @@ class _ModernPlayButton extends StatelessWidget {
                         color: Colors.white,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.play_arrow_rounded, color: Color(0xFFE65100), size: 24),
+                      child: const Icon(
+                        Icons.play_arrow_rounded,
+                        color: Color(0xFF00B4DB), // Deep Cyan Icon
+                        size: 24,
+                      ),
                     ),
                     const SizedBox(width: 15),
                     Text(
@@ -1369,10 +1565,219 @@ class _ButtonPatternPainter extends CustomPainter {
       canvas.drawLine(Offset(i, 0), Offset(i - 20, size.height), paint);
     }
   }
+
   @override
   bool shouldRepaint(CustomPainter oldDelegate) => false;
 }
 
+class AdConfirmationOverlay extends StatelessWidget {
+  final ScrewPuzzleGame game;
+  const AdConfirmationOverlay({super.key, required this.game});
 
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        // Backdrop Blur
+        Positioned.fill(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 7, sigmaY: 7),
+            child: Container(color: Colors.black.withOpacity(0.6)),
+          ),
+        ),
+        Center(
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.0, end: 1.0),
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeOutBack,
+            builder: (context, value, child) {
+              return Transform.scale(scale: value, child: child);
+            },
+            child: Container(
+              width: 320,
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [
+                    Color(0xFF00E5FF), // Cyan Edge
+                    Color(0xFF001F24), // Dark Sci-Fi Inner
+                    Color(0xFF00E5FF), // Cyan Edge
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF00E5FF).withOpacity(0.2), // Cyan Shadow
+                    blurRadius: 30,
+                    spreadRadius: 5,
+                  ),
+                ],
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A1A),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Icon
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00E5FF).withOpacity(0.1), // Cyan Light
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.lock_open_rounded,
+                        color: Color(0xFF00E5FF), // Pure Cyan
+                        size: 48,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'UNLOCK SLOT',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 2,
+                        fontFamily: 'Courier',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Watch a short video to gain permanent access to this industrial slot.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.6),
+                        fontSize: 13,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                    const SizedBox(height: 32),
 
+                    // Buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildButton(
+                            label: 'CANCEL',
+                            isPrimary: false,
+                            onPressed: () {
+                              game.overlays.remove('AdConfirmation');
+                              game.pendingAdHole = null;
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildButton(
+                            label: 'WATCH AD',
+                            isPrimary: true,
+                            onPressed: () {
+                              game.overlays.remove('AdConfirmation');
+                              game.overlays.add('Loading');
 
+                              AdService().showRewardedAd(
+                                onAdLoaded: () {
+                                  game.overlays.remove('Loading');
+                                },
+                                onRewardEarned: () {
+                                  if (game.pendingAdHole != null) {
+                                    game.pendingAdHole!.isAdLocked = false;
+                                    game.audio.playVictory();
+                                    game.updateHoleHighlights();
+                                    game.pendingAdHole = null;
+                                  }
+                                },
+                                onAdFailed: () {
+                                  game.overlays.remove('Loading');
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildButton({
+    required String label,
+    required bool isPrimary,
+    required VoidCallback onPressed,
+  }) {
+    return ElevatedButton(
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: isPrimary
+            ? const Color(0xFFFF9800)
+            : Colors.transparent,
+        foregroundColor: isPrimary ? Colors.black : Colors.white60,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        elevation: 0,
+        side: isPrimary
+            ? null
+            : BorderSide(color: Colors.white.withOpacity(0.1)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 12,
+          letterSpacing: 1,
+        ),
+      ),
+    );
+  }
+}
+
+class LoadingOverlay extends StatelessWidget {
+  final ScrewPuzzleGame game;
+  const LoadingOverlay({super.key, required this.game});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.black.withOpacity(0.8),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: 50,
+              height: 50,
+              child: CircularProgressIndicator(
+                color: Color(0xFFFF9800),
+                strokeWidth: 4,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'LOADING SECURE AD STREAM...',
+              style: TextStyle(
+                color: const Color(0xFFFF9800).withOpacity(0.8),
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 2,
+                fontFamily: 'monospace',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

@@ -13,8 +13,8 @@ class LevelClearEffect extends PositionComponent with HasGameRef {
   Future<void> onLoad() async {
     await super.onLoad();
     
-    // Set position to center of the camera
-    position = gameRef.camera.viewfinder.position;
+    // Set position to center of the screen (viewport)
+    position = gameRef.camera.viewport.size / 2;
     
     // Generate particles
     final rnd = Random();
@@ -65,7 +65,7 @@ class LevelClearEffect extends PositionComponent with HasGameRef {
       canvas.drawCircle(Offset.zero, _radius, ringPaint);
       
       final innerRingPaint = Paint()
-        ..color = const Color(0xFF3B82F6).withOpacity(_opacity * 0.8)
+        ..color = const Color(0xFF00E5FF).withOpacity(_opacity * 0.8) // Cyan inner ring
         ..style = PaintingStyle.stroke
         ..strokeWidth = 0.5;
       canvas.drawCircle(Offset.zero, _radius * 0.9, innerRingPaint);
@@ -76,8 +76,8 @@ class LevelClearEffect extends PositionComponent with HasGameRef {
       if (p.life > 0) {
         final pOpacity = (p.life).clamp(0.0, 1.0);
         final paint = Paint()
-          ..color = const Color(0xFF60A5FA).withOpacity(pOpacity)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 0.5);
+          ..color = const Color(0xFF00B4DB).withOpacity(pOpacity) // Deep Cyan particles
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5); // More glow
         canvas.drawCircle(p.position.toOffset(), p.size, paint);
         
         // Core
