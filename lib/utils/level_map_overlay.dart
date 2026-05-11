@@ -1,9 +1,52 @@
 import 'package:flutter/material.dart';
 import '../game/screw_game.dart';
 
-class LevelMapOverlay extends StatelessWidget {
+class LevelMapOverlay extends StatefulWidget {
   final ScrewPuzzleGame game;
   const LevelMapOverlay({super.key, required this.game});
+
+  @override
+  State<LevelMapOverlay> createState() => _LevelMapOverlayState();
+}
+
+class _LevelMapOverlayState extends State<LevelMapOverlay> {
+  ScrollController _scrollController = ScrollController();
+  bool _controllerInitialized = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Only create once — MediaQuery is available here (unlike initState)
+    if (!_controllerInitialized) {
+      _controllerInitialized = true;
+      _scrollController = ScrollController(
+        initialScrollOffset: _calculateTargetOffset(context),
+      );
+    }
+  }
+
+  double _calculateTargetOffset(BuildContext context) {
+    final currentLevel = widget.game.currentLevel;
+    final rowIndex = (currentLevel - 1) ~/ 4; // 0-based row number
+    if (rowIndex == 0) return 0.0; // level 1-4 already at top
+
+    final screenWidth = MediaQuery.of(context).size.width;
+    final containerWidth = screenWidth * 0.95;
+    final gridContentWidth = containerWidth - 50; // 25px padding each side
+    final cellWidth = (gridContentWidth - 3 * 20) / 4; // 3 gaps of 20px
+    final cellHeight = cellWidth / 0.85; // childAspectRatio = 0.85
+    final rowHeight = cellHeight + 35; // + mainAxisSpacing
+
+    // Scroll so current level row is visible near top
+    final offset = 30.0 + rowIndex * rowHeight - rowHeight * 0.3;
+    return offset.clamp(0.0, double.infinity);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -11,7 +54,6 @@ class LevelMapOverlay extends StatelessWidget {
       color: Colors.black.withOpacity(0.9),
       child: Stack(
         children: [
-          // 1. OUTERMOST FRAME (THE MACHINE CASING)
           Center(
             child: Container(
               width: MediaQuery.of(context).size.width * 0.95,
@@ -21,20 +63,13 @@ class LevelMapOverlay extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
                 child: Stack(
                   children: [
-                    // Background Texture (Gears & Pipes)
                     _buildBackgroundDecoration(),
-
-                    // 2. HEADER AREA
                     _buildPremiumHeader(),
-
-                    // 3. SCROLLABLE CONTENT
                     Positioned.fill(
                       top: 100,
                       bottom: 100,
                       child: _buildScrollableGrid(),
                     ),
-
-                    // 4. FOOTER CONTROLS
                     Align(
                       alignment: Alignment.bottomCenter,
                       child: _buildPremiumFooter(context),
@@ -122,6 +157,7 @@ class LevelMapOverlay extends StatelessWidget {
 
   Widget _buildScrollableGrid() {
     return GridView.builder(
+      controller: _scrollController, // ← attached here
       padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 30),
       physics: const BouncingScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -134,7 +170,7 @@ class LevelMapOverlay extends StatelessWidget {
       itemBuilder: (context, index) {
         final level = index + 1;
         final isUnlocked = level <= 12;
-        final isCurrent = level == game.currentLevel;
+        final isCurrent = level == widget.game.currentLevel;
         return _build3DLevelButton(level, isUnlocked, isCurrent);
       },
     );
@@ -142,12 +178,14 @@ class LevelMapOverlay extends StatelessWidget {
 
   Widget _build3DLevelButton(int level, bool isUnlocked, bool isCurrent) {
     return GestureDetector(
-      onTap: isUnlocked ? () {
-        game.currentLevel = level;
-        game.resetLevel();
-        game.overlays.remove('LevelMap');
-        game.overlays.remove('MainMenu');
-      } : null,
+      onTap: isUnlocked
+          ? () {
+              widget.game.currentLevel = level;
+              widget.game.resetLevel();
+              widget.game.overlays.remove('LevelMap');
+              widget.game.overlays.remove('MainMenu');
+            }
+          : null,
       child: Column(
         children: [
           Container(
@@ -157,33 +195,38 @@ class LevelMapOverlay extends StatelessWidget {
               shape: BoxShape.circle,
               gradient: RadialGradient(
                 center: const Alignment(-0.3, -0.3),
-                colors: isCurrent 
-                  ? [const Color(0xFFFFD700), const Color(0xFFB8860B), const Color(0xFF3E2723)]
-                  : (isUnlocked 
-                      ? [const Color(0xFF4A4A4A), const Color(0xFF2A2A2A), const Color(0xFF0F0F0F)]
-                      : [const Color(0xFF1A1A1A), const Color(0xFF0F0F0F), Colors.black]),
+                colors: isCurrent
+                    ? [const Color(0xFFFFD700), const Color(0xFFB8860B), const Color(0xFF3E2723)]
+                    : (isUnlocked
+                        ? [const Color(0xFF4A4A4A), const Color(0xFF2A2A2A), const Color(0xFF0F0F0F)]
+                        : [const Color(0xFF1A1A1A), const Color(0xFF0F0F0F), Colors.black]),
               ),
               border: Border.all(
-                color: isCurrent ? const Color(0xFFFFD700) : (isUnlocked ? const Color(0xFF8B5E3C) : Colors.white10),
+                color: isCurrent
+                    ? const Color(0xFFFFD700)
+                    : (isUnlocked ? const Color(0xFF8B5E3C) : Colors.white10),
                 width: 3,
               ),
               boxShadow: [
                 BoxShadow(color: Colors.black.withOpacity(0.6), blurRadius: 8, offset: const Offset(4, 4)),
-                if (isCurrent) BoxShadow(color: const Color(0xFFFFD700).withOpacity(0.4), blurRadius: 20, spreadRadius: 2),
+                if (isCurrent)
+                  BoxShadow(color: const Color(0xFFFFD700).withOpacity(0.4), blurRadius: 20, spreadRadius: 2),
               ],
             ),
             child: Center(
-              child: isUnlocked 
-                ? Text(
-                    '$level',
-                    style: TextStyle(
-                      color: isCurrent ? Colors.black : const Color(0xFFD4AF37),
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      shadows: isCurrent ? [] : [const Shadow(color: Colors.black, blurRadius: 2, offset: Offset(1, 1))],
-                    ),
-                  )
-                : const Icon(Icons.lock_outline_rounded, color: Colors.white10, size: 24),
+              child: isUnlocked
+                  ? Text(
+                      '$level',
+                      style: TextStyle(
+                        color: isCurrent ? Colors.black : const Color(0xFFD4AF37),
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        shadows: isCurrent
+                            ? []
+                            : [const Shadow(color: Colors.black, blurRadius: 2, offset: Offset(1, 1))],
+                      ),
+                    )
+                  : const Icon(Icons.lock_outline_rounded, color: Colors.white10, size: 24),
             ),
           ),
           if (isCurrent)
@@ -206,7 +249,7 @@ class LevelMapOverlay extends StatelessWidget {
       ),
       child: Center(
         child: GestureDetector(
-          onTap: () => game.overlays.remove('LevelMap'),
+          onTap: () => widget.game.overlays.remove('LevelMap'),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
             decoration: BoxDecoration(
@@ -225,4 +268,3 @@ class LevelMapOverlay extends StatelessWidget {
     );
   }
 }
-

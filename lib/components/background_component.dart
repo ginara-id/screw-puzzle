@@ -1,21 +1,22 @@
+import 'dart:ui';
 import 'package:flame/components.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Image, Picture; // Hide to avoid conflict
 import '../game/screw_game.dart';
 
 class BackgroundComponent extends PositionComponent with HasGameRef<ScrewPuzzleGame> {
-  bool _isLoaded = false;
+  Picture? _cachedPicture;
 
   @override
   Future<void> onLoad() async {
     await super.onLoad();
     size = gameRef.canvasSize;
     priority = -10;
-    _isLoaded = true;
+    _preRender();
   }
 
-  @override
-  void render(Canvas canvas) {
-    if (!_isLoaded) return;
+  void _preRender() {
+    final recorder = PictureRecorder();
+    final canvas = Canvas(recorder);
     final rect = size.toRect();
 
     // 1. DEEP CHARCOAL LINEAR GRADIENT
@@ -26,37 +27,26 @@ class BackgroundComponent extends PositionComponent with HasGameRef<ScrewPuzzleG
         colors: [
           const Color(0xFF0F171E), // Near Black
           const Color(0xFF1C2833), // Deep Charcoal
-          const Color(0xFF151922), // Dark Navy/Charcoal
+          const Color(0xFF121212), // Dark Charcoal (No Navy)
         ],
       ).createShader(rect);
     canvas.drawRect(rect, bgPaint);
 
-    // 2. SIMULATED CARBON FIBER TEXTURE (Subtle crosshatch pattern)
-    // Since we don't have the image asset loaded yet, we draw a programmatic carbon weave
+    // 2. SIMULATED CARBON FIBER TEXTURE
     final weavePaint = Paint()
       ..color = Colors.black.withOpacity(0.2)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0;
 
     final weaveSpacing = 8.0;
-    
-    // Draw diagonal lines to simulate the weave
     for (double i = -size.y; i < size.x; i += weaveSpacing) {
-      canvas.drawLine(
-        Offset(i, 0),
-        Offset(i + size.y, size.y),
-        weavePaint,
-      );
+      canvas.drawLine(Offset(i, 0), Offset(i + size.y, size.y), weavePaint);
     }
     for (double i = size.x + size.y; i > 0; i -= weaveSpacing) {
-      canvas.drawLine(
-        Offset(i, 0),
-        Offset(i - size.y, size.y),
-        weavePaint,
-      );
+      canvas.drawLine(Offset(i, 0), Offset(i - size.y, size.y), weavePaint);
     }
-    
-    // Add subtle shadow vignette around the edges
+
+    // 3. VIGNETTE
     final vignettePaint = Paint()
       ..shader = RadialGradient(
         center: Alignment.center,
@@ -67,5 +57,20 @@ class BackgroundComponent extends PositionComponent with HasGameRef<ScrewPuzzleG
         ],
       ).createShader(rect);
     canvas.drawRect(rect, vignettePaint);
+
+    _cachedPicture = recorder.endRecording();
+  }
+
+  @override
+  void render(Canvas canvas) {
+    if (_cachedPicture != null) {
+      canvas.drawPicture(_cachedPicture!);
+    }
+  }
+
+  @override
+  void onRemove() {
+    _cachedPicture?.dispose();
+    super.onRemove();
   }
 }

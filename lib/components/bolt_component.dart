@@ -133,9 +133,9 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
       const Color(0xFF3E2723),
     ];
     final cleanColors = [
-      Colors.white,
-      const Color(0xFFBDC3C7),
-      const Color(0xFF7F8C8D),
+      const Color(0xFFFFEB3B), // Bright Yellow
+      const Color(0xFFFBC02D), // Deep Yellow
+      const Color(0xFFF9A825), // Golden Amber
     ];
 
     final currentColors = List.generate(3, (i) => Color.lerp(cleanColors[i], rustColors[i], progress)!);
@@ -257,8 +257,8 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
 
     final shape = CircleShape()..radius = radius;
     final fixtureDef = FixtureDef(shape)
-      ..friction = 0.5 // More grip
-      ..restitution = 0.0 // No micro-bounce to stop jitter
+      ..friction = 0.7 // Balanced grip for both impact and resting
+      ..restitution = 0.0
       ..filter.categoryBits = ScrewPuzzleGame.kBoltHoleCategory
       ..filter.maskBits = ScrewPuzzleGame.kPlateCategory; // Solid by default
 

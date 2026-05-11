@@ -22,6 +22,21 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
 
   final List<Vector2> _localHoles = [];
   double _glintTimer = Random().nextDouble() * 3.0;
+  bool _isHardPinned = false; // true when held by 2+ joints
+
+  /// Called by ScrewGame to freeze/unfreeze this plate
+  void setHardPinned(bool value) => _isHardPinned = value;
+
+  /// Enable or disable physical collision with bolts.
+  /// Must REASSIGN filterData (not just mutate) to trigger Forge2D refilter.
+  void setCollisionEnabled(bool enabled) {
+    for (final fixture in body.fixtures) {
+      final filter = fixture.filterData; // get current
+      filter.maskBits = enabled ? ScrewPuzzleGame.kBoltHoleCategory : 0;
+      fixture.filterData = filter; // reassign → triggers world.refilter() internally
+    }
+  }
+
   
   // CACHED PAINTS & SHADERS for performance
   late final Paint _shadowPaint;
@@ -33,6 +48,7 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
   late final Paint _glintPaint;
   Rect? _lastRect;
   Shader? _surfaceShader;
+  Shader? _glintShader;
 
 
 
@@ -135,6 +151,32 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
       _errorFlashTimer -= dt;
     }
     _glintTimer += dt;
+
+    // Kill all physics-solver residual velocity every frame when fully pinned
+    if (_isHardPinned) {
+      body.linearVelocity = Vector2.zero();
+      body.angularVelocity = 0;
+      return;
+    }
+
+    // SMART STABILIZATION: Dampen and Force Sleep on resting contacts to eliminate all jitter
+    if (body.isAwake) {
+      final linVel = body.linearVelocity.length;
+      final angVel = body.angularVelocity.abs();
+
+      // 1. Damping Zone: Start aggressively bleeding energy when moving slowly
+      if (linVel < 0.8 && angVel < 0.8) {
+        body.linearVelocity.scale(0.90);
+        body.angularVelocity *= 0.90;
+
+        // 2. Snap Zone: If near standstill, hard-reset and FORCE SLEEP
+        if (linVel < 0.1 && angVel < 0.1) {
+          body.linearVelocity = Vector2.zero();
+          body.angularVelocity = 0;
+          body.setAwake(false); // Eliminates processing entirely -> ZERO jitter
+        }
+      }
+    }
   }
 
   @override
@@ -143,10 +185,11 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
       userData: this,
       position: initialPosition,
       type: BodyType.dynamic,
-      linearDamping: 0.5, // Stable damping from reference
-      angularDamping: 0.5, // Stable damping from reference
+      linearDamping: 0.5,
+      angularDamping: 0.5,
       gravityScale: Vector2.all(1.0),
       allowSleep: true,
+      bullet: true, // Continuous collision detection active from the start
     );
 
     Shape shape;
@@ -170,11 +213,11 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
     }
 
     final fixtureDef = FixtureDef(shape)
-      ..density = 1.0 // Light weight for stability
-      ..friction = 0.5 // More grip
-      ..restitution = 0.0 // No micro-bounce to stop jitter
+      ..density = 0.3
+      ..friction = 0.8 // Raised friction ensures plates 'stick' securely and stabilize faster
+      ..restitution = 0.0
       ..filter.categoryBits = ScrewPuzzleGame.kPlateCategory
-      ..filter.maskBits = ScrewPuzzleGame.kBoltHoleCategory; // Stable: Only collide with bolts
+      ..filter.maskBits = ScrewPuzzleGame.kBoltHoleCategory; // Enable collision by default to avoid initialization race conditions
 
     return world.createBody(bodyDef)..createFixture(fixtureDef);
   }
@@ -288,7 +331,7 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
     canvas.drawPath(_platePath.shift(Offset(shadowOffsetVec.x, shadowOffsetVec.y)), _shadowPaint);
 
     // 2. Surface (Shader Caching)
-    if (_lastRect != rect) {
+    if (_lastRect != rect || _surfaceShader == null) {
       _lastRect = rect;
       _surfaceShader = LinearGradient(
         begin: Alignment.topLeft,
@@ -310,10 +353,12 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
     // 4. Border
     canvas.drawPath(_platePath, _borderPaint);
 
-    // 5. Glint (Animated Shader)
+    // 5. Optimized Glint (Using translation to avoid shader re-creation)
     final glintProgress = (_glintTimer % 5.0) / 5.0;
     final glintX = -size.x + (glintProgress * size.x * 6);
-    _glintPaint.shader = LinearGradient(
+    
+    if (_glintShader == null) {
+      _glintShader = LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
@@ -321,9 +366,16 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
           Colors.white.withOpacity(0.15),
           Colors.white.withOpacity(0.0),
         ],
-      ).createShader(Rect.fromLTWH(glintX, -size.y, size.x * 0.4, size.y * 2));
+      ).createShader(Rect.fromLTWH(0, -size.y, size.x * 0.4, size.y * 2));
+    }
     
-    canvas.drawPath(_platePath, _glintPaint);
+    _glintPaint.shader = _glintShader;
+    
+    canvas.save();
+    canvas.clipPath(_platePath);
+    canvas.translate(glintX, 0);
+    canvas.drawPaint(_glintPaint);
+    canvas.restore();
 
     // 6. Rims
     for (final localPos in _localHoles) {

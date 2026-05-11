@@ -409,11 +409,11 @@ class _HUDMenuState extends State<HUDMenu> with SingleTickerProviderStateMixin {
                         width: 10,
                         height: 10,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF00E5FF),
+                          color: const Color(0xFFFFD600),
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF00E5FF).withOpacity(0.8), 
+                              color: const Color(0xFFFFD600).withOpacity(0.8), 
                               blurRadius: 10,
                               spreadRadius: 2,
                             )
@@ -499,7 +499,7 @@ class _HUDMenuState extends State<HUDMenu> with SingleTickerProviderStateMixin {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          _buildBoosterItem(Icons.radar, 'SCAN', const Color(0xFF00E5FF)),
+                          _buildBoosterItem(Icons.radar, 'SCAN', const Color(0xFFFFD600)),
                           const SizedBox(width: 16),
                           _buildBoosterItem(Icons.build, 'REMOVE', const Color(0xFFFF9800)),
                           const SizedBox(width: 16),
@@ -542,7 +542,7 @@ class _HUDMenuState extends State<HUDMenu> with SingleTickerProviderStateMixin {
                                 fontFamily: 'Courier',
                                 shadows: [
                                   Shadow(
-                                    color: isLowTime ? const Color(0xFFFF3333) : const Color(0xFF00E5FF).withOpacity(0.6), 
+                                    color: isLowTime ? const Color(0xFFFF3333) : const Color(0xFFFFD600).withOpacity(0.6), 
                                     blurRadius: 15
                                   )
                                 ],
@@ -551,7 +551,7 @@ class _HUDMenuState extends State<HUDMenu> with SingleTickerProviderStateMixin {
                             Text(
                               'TIME REMAINING',
                               style: TextStyle(
-                                color: const Color(0xFF00E5FF).withOpacity(0.6), 
+                                color: const Color(0xFFFFD600).withOpacity(0.6), 
                                 fontSize: 8,
                                 fontFamily: 'monospace',
                                 fontWeight: FontWeight.bold,
@@ -586,7 +586,7 @@ class _HUDMenuState extends State<HUDMenu> with SingleTickerProviderStateMixin {
             border: Border.all(color: Colors.white.withOpacity(0.15), width: 1.0), // Hairline highlight
             boxShadow: [
               BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 30, spreadRadius: -5),
-              BoxShadow(color: const Color(0xFF00E5FF).withOpacity(0.05), blurRadius: 20, spreadRadius: 5), // Cyan ambient glow
+              BoxShadow(color: const Color(0xFFFFD600).withOpacity(0.05), blurRadius: 20, spreadRadius: 5), // Cyan ambient glow
             ],
           ),
           child: child,
@@ -599,7 +599,7 @@ class _HUDMenuState extends State<HUDMenu> with SingleTickerProviderStateMixin {
     return IconButton(
       onPressed: onPressed,
       icon: Icon(icon, color: Colors.white.withOpacity(0.9), size: 24),
-      splashColor: const Color(0xFF00E5FF).withOpacity(0.3),
+      splashColor: const Color(0xFFFFD600).withOpacity(0.3),
       highlightColor: Colors.transparent,
       constraints: const BoxConstraints(),
       padding: const EdgeInsets.all(10),
@@ -709,6 +709,7 @@ class MainMenu extends StatefulWidget {
 class _MainMenuState extends State<MainMenu>
     with SingleTickerProviderStateMixin {
   late AnimationController _animController;
+  late ScrollController _scrollController;
 
   @override
   void initState() {
@@ -717,11 +718,17 @@ class _MainMenuState extends State<MainMenu>
       vsync: this,
       duration: const Duration(seconds: 4),
     )..repeat(reverse: true);
+
+    // With reverse:true, each node is 150px. Scroll (currentLevel-1)*150
+    // so the current level appears near the bottom of the screen on open.
+    final targetOffset = ((widget.game.currentLevel - 1) * 150.0).clamp(0.0, double.infinity);
+    _scrollController = ScrollController(initialScrollOffset: targetOffset);
   }
 
   @override
   void dispose() {
     _animController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -786,7 +793,7 @@ class _MainMenuState extends State<MainMenu>
                 spreadRadius: -5,
               ),
               BoxShadow(
-                color: const Color(0xFF00E5FF).withOpacity(0.05), // Cyan ambient glow
+                color: const Color(0xFFFFD600).withOpacity(0.05), // Cyan ambient glow
                 blurRadius: 20,
                 spreadRadius: 5,
               ),
@@ -802,16 +809,16 @@ class _MainMenuState extends State<MainMenu>
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF00E5FF).withOpacity(0.1),
+                      color: const Color(0xFFFFD600).withOpacity(0.1),
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: const Color(0xFF00E5FF).withOpacity(0.3),
+                        color: const Color(0xFFFFD600).withOpacity(0.3),
                         width: 1.5,
                       ),
                     ),
                     child: const Icon(
                       Icons.precision_manufacturing_rounded,
-                      color: Color(0xFF00E5FF),
+                      color: Color(0xFFFFD600),
                       size: 20,
                     ),
                   ),
@@ -823,7 +830,7 @@ class _MainMenuState extends State<MainMenu>
                       Text(
                         'CURRENT SECTOR',
                         style: TextStyle(
-                          color: const Color(0xFF00E5FF).withOpacity(0.6),
+                          color: const Color(0xFFFFD600).withOpacity(0.6),
                           fontSize: 9,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 1,
@@ -839,7 +846,7 @@ class _MainMenuState extends State<MainMenu>
                           letterSpacing: 1,
                           fontFamily: 'Courier',
                           shadows: [
-                            Shadow(color: Color(0xFF00E5FF), blurRadius: 10),
+                            Shadow(color: Color(0xFFFFD600), blurRadius: 10),
                           ],
                         ),
                       ),
@@ -870,7 +877,7 @@ class _MainMenuState extends State<MainMenu>
       ),
       child: IconButton(
         onPressed: onPressed,
-        icon: Icon(icon, color: const Color(0xFF00E5FF), size: 28), // Updated to Cyan
+        icon: Icon(icon, color: const Color(0xFFFFD600), size: 28), // Updated to Cyan
         padding: const EdgeInsets.all(12),
       ),
     );
@@ -884,7 +891,7 @@ class _MainMenuState extends State<MainMenu>
           return CustomPaint(
             painter: _ModernGridPainter(
               animValue: _animController.value,
-              gridColor: const Color(0xFF00E5FF).withOpacity(0.05), // Updated to Cyan
+              gridColor: const Color(0xFFFFD600).withOpacity(0.05), // Updated to Cyan
             ),
           );
         },
@@ -907,6 +914,7 @@ class _MainMenuState extends State<MainMenu>
 
   Widget _buildJourneyList() {
     return ListView.builder(
+      controller: _scrollController, // ← auto-scroll to current level
       reverse: true,
       padding: const EdgeInsets.only(top: 100, bottom: 200),
       physics: const BouncingScrollPhysics(),
@@ -998,7 +1006,7 @@ class _ParticlePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = const Color(0xFF00E5FF).withOpacity(0.15); // Updated to Cyan
+    final paint = Paint()..color = const Color(0xFFFFD600).withOpacity(0.15); // Updated to Cyan
 
     for (var i = 0; i < particles.length; i++) {
       final p = particles[i];
@@ -1256,7 +1264,7 @@ class _BoltNodePainter extends CustomPainter {
     // 1. Bolt Outer Ring
     final ringPaint = Paint()
       ..color = isCurrent
-          ? const Color(0xFF00E5FF).withOpacity(0.5) // Updated to Cyan
+          ? const Color(0xFFFFD600).withOpacity(0.5) // Updated to Cyan
           : Colors.white.withOpacity(0.1)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2;
@@ -1270,7 +1278,7 @@ class _BoltNodePainter extends CustomPainter {
             ? (isCurrent
                   ? [
                       const Color(0xFF84FFFF), // Light Cyan
-                      const Color(0xFF00E5FF), // Pure Cyan
+                      const Color(0xFFFFD600), // Pure Cyan
                       const Color(0xFF006064), // Dark Teal
                     ]
                   : [
@@ -1333,7 +1341,7 @@ class _BoltNodePainter extends CustomPainter {
       // Badge Background
       final badgePaint = Paint()
         ..color = isCurrent
-            ? const Color(0xFF00E5FF) // Updated to Cyan
+            ? const Color(0xFFFFD600) // Updated to Cyan
             : Colors.black.withOpacity(0.5)
         ..style = PaintingStyle.fill;
 
@@ -1344,7 +1352,7 @@ class _BoltNodePainter extends CustomPainter {
 
       if (isCurrent) {
         final badgeGlow = Paint()
-          ..color = const Color(0xFF00E5FF).withOpacity(0.3) // Updated to Cyan
+          ..color = const Color(0xFFFFD600).withOpacity(0.3) // Updated to Cyan
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
         canvas.drawRRect(
           RRect.fromRectAndRadius(badgeRect, const Radius.circular(4)),
@@ -1395,7 +1403,7 @@ class _BoltNodePainter extends CustomPainter {
     // 6. Current Scanning Ring
     if (isCurrent) {
       final scanPaint = Paint()
-        ..color = const Color(0xFF00E5FF).withOpacity(0.6 * (1.0 - animValue)) // Updated to Cyan
+        ..color = const Color(0xFFFFD600).withOpacity(0.6 * (1.0 - animValue)) // Updated to Cyan
         ..style = PaintingStyle.stroke
         ..strokeWidth = 3;
       canvas.drawCircle(center, radius + 5 + (animValue * 15), scanPaint);
@@ -1428,7 +1436,7 @@ class _ModernPathPainter extends CustomPainter {
 
     final basePaint = Paint()
       ..color = isUnlocked
-          ? const Color(0xFF00E5FF).withOpacity(0.15) // Updated to Cyan
+          ? const Color(0xFFFFD600).withOpacity(0.15) // Updated to Cyan
           : Colors.white.withOpacity(0.03)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 8
@@ -1440,9 +1448,9 @@ class _ModernPathPainter extends CustomPainter {
       final energyPaint = Paint()
         ..shader = LinearGradient(
           colors: [
-            const Color(0xFF00E5FF).withOpacity(0.0), // Updated to Cyan
-            const Color(0xFF00E5FF),
-            const Color(0xFF00E5FF).withOpacity(0.0),
+            const Color(0xFFFFD600).withOpacity(0.0), // Updated to Cyan
+            const Color(0xFFFFD600),
+            const Color(0xFFFFD600).withOpacity(0.0),
           ],
           stops: const [0.0, 0.5, 1.0],
         ).createShader(Rect.fromPoints(start, end))
@@ -1494,13 +1502,13 @@ class _ModernPlayButton extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(35),
           gradient: const LinearGradient(
-            colors: [Color(0xFF00B4DB), Color(0xFF00E5FF)], // Modern Cyan Gradient
+            colors: [Color(0xFFFFAB00), Color(0xFFFFD600)], // Modern Cyan Gradient
             begin: Alignment.centerLeft,
             end: Alignment.centerRight,
           ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF00E5FF).withOpacity(0.3), // Cyan Glow
+              color: const Color(0xFFFFD600).withOpacity(0.3), // Cyan Glow
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -1529,7 +1537,7 @@ class _ModernPlayButton extends StatelessWidget {
                       ),
                       child: const Icon(
                         Icons.play_arrow_rounded,
-                        color: Color(0xFF00B4DB), // Deep Cyan Icon
+                        color: Color(0xFFFFAB00), // Deep Cyan Icon
                         size: 24,
                       ),
                     ),
@@ -1599,9 +1607,9 @@ class AdConfirmationOverlay extends StatelessWidget {
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: [
-                    Color(0xFF00E5FF), // Cyan Edge
+                    Color(0xFFFFD600), // Cyan Edge
                     Color(0xFF001F24), // Dark Sci-Fi Inner
-                    Color(0xFF00E5FF), // Cyan Edge
+                    Color(0xFFFFD600), // Cyan Edge
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -1609,7 +1617,7 @@ class AdConfirmationOverlay extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF00E5FF).withOpacity(0.2), // Cyan Shadow
+                    color: const Color(0xFFFFD600).withOpacity(0.2), // Cyan Shadow
                     blurRadius: 30,
                     spreadRadius: 5,
                   ),
@@ -1628,12 +1636,12 @@ class AdConfirmationOverlay extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF00E5FF).withOpacity(0.1), // Cyan Light
+                        color: const Color(0xFFFFD600).withOpacity(0.1), // Cyan Light
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
                         Icons.lock_open_rounded,
-                        color: Color(0xFF00E5FF), // Pure Cyan
+                        color: Color(0xFFFFD600), // Pure Cyan
                         size: 48,
                       ),
                     ),
