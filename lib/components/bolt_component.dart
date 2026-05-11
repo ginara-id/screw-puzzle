@@ -350,4 +350,11 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
       ),
     );
   }
+
+  void cureRust() {
+    if (!isRusty) return;
+    isRusty = false;
+    hitsRemaining = 1; // Setting trigger built-in cache regeneration automatically
+    _buildCachedBolt(); // Force flush just in case
+  }
 }

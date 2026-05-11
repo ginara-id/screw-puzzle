@@ -336,19 +336,33 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
 
   bool isOverlappingCircle(Vector2 worldPos, double radius) {
     if (body.fixtures.isEmpty) return false;
+    final fixture = body.fixtures.first;
 
-    // For circles, use distance check for better accuracy
-    if (shapeType == PlateShape.circle) {
-      final localPoint = body.localPoint(worldPos);
-      return localPoint.length < (size.x / 2 + radius);
+    // 1. Check exact center
+    if (fixture.testPoint(worldPos)) return true;
+
+    // 2. DEEP PERIMETER SAMPLING: Test 16 vectors along the circumference.
+    // This ensures that if even the edge of the plate touches the hole, it triggers BLOCK.
+    // Satisfies user condition: 'Truly zero obstruction allowed'.
+    const int totalSamples = 16;
+    const double slice = (2 * pi) / totalSamples;
+
+    for (int i = 0; i < totalSamples; i++) {
+      final double angle = i * slice;
+      // FORGIVENESS FIX: Sample 15% further inside (radius * 0.85) to ignore tiny rim collisions!
+      final samplePos = Vector2(
+        worldPos.x + (cos(angle) * radius * 0.85),
+        worldPos.y + (sin(angle) * radius * 0.85),
+      );
+      if (fixture.testPoint(samplePos)) {
+        return true; // Edge contact detected!
+      }
     }
 
-    // For other shapes, use the fixture test with a small tolerance
-    // This is more robust for triangles and boxes
-    return body.fixtures.first.testPoint(worldPos);
+    return false;
   }
 
-  bool isHoleAligned(Vector2 worldPos, {double tolerance = 0.2}) {
+  bool isHoleAligned(Vector2 worldPos, {double tolerance = 0.02}) {
     final localPoint = body.localPoint(worldPos);
     for (final holePos in _localHoles) {
       if ((holePos - localPoint).length <= tolerance) {

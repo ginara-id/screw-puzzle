@@ -1,5 +1,5 @@
 {
-  "timeLimit": 160,
+  "timeLimit": 60,
 "bolts": [
     {"x": -3.0, "y": 17.0, "isRusty": true},
     {"x":  0.0, "y": 17.0, "isRusty": true},

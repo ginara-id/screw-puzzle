@@ -1,13 +1,15 @@
 {
-  "timeLimit": 150,
+  "timeLimit": 40,
   "bolts": [
     {
       "x": -2.0,
-      "y": 17.0
+      "y": 17.0,
+      "isRusty": true
     },
     {
       "x": 2.0,
-      "y": 17.0
+      "y": 17.0,
+      "isRusty": true
     },
     {
       "x": -2.0,
@@ -31,11 +33,13 @@
     },
     {
       "x": 2.0,
-      "y": 20.0
+      "y": 20.0,
+      "isRusty": true
     },
     {
       "x": 0.0,
-      "y": 20.0
+      "y": 20.0,
+      "isRusty": true
     }
   ],
   "holes": [

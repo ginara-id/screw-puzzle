@@ -1,6 +1,6 @@
 {
-  "timeLimit": 100,
-"bolts": [
+  "timeLimit": 25,
+  "bolts": [
     {
       "x": -2.5,
       "y": 18.0

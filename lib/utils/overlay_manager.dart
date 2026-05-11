@@ -363,8 +363,10 @@ class HUDMenu extends StatefulWidget {
   State<HUDMenu> createState() => _HUDMenuState();
 }
 
-class _HUDMenuState extends State<HUDMenu> with SingleTickerProviderStateMixin {
+class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
   late AnimationController _pulseController;
+  late AnimationController _bonusController;
+  double _displayBonus = 0.0;
 
   @override
   void initState() {
@@ -373,11 +375,32 @@ class _HUDMenuState extends State<HUDMenu> with SingleTickerProviderStateMixin {
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
+
+    _bonusController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+
+    widget.game.timeBonusNotifier.addListener(_onTimeBonus);
+  }
+
+  void _onTimeBonus() {
+    if (!mounted) return;
+    final val = widget.game.timeBonusNotifier.value;
+    if (val <= 0) return;
+
+    setState(() {
+      _displayBonus = val;
+    });
+    
+    _bonusController.forward(from: 0);
   }
 
   @override
   void dispose() {
+    widget.game.timeBonusNotifier.removeListener(_onTimeBonus);
     _pulseController.dispose();
+    _bonusController.dispose();
     super.dispose();
   }
 
@@ -394,6 +417,100 @@ class _HUDMenuState extends State<HUDMenu> with SingleTickerProviderStateMixin {
         return SizedBox.expand(
           child: Stack(
             children: [
+              // --- THE ULTIMATE HYPNOTIC ARCADE HUD ---
+              // Pure ambient addiction: Fills vision, screams intensity, but ignores all touch!
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: ValueListenableBuilder<double>(
+                            valueListenable: widget.game.comboUpdateNotifier,
+                            builder: (context, percent, _) {
+                              final count = widget.game.comboCount;
+                              if (percent <= 0 || count <= 1) return const SizedBox.shrink();
+                              
+                              final comboColor = count == 1 ? const Color(0xFFFFD600) : 
+                                                 (count == 2 ? const Color(0xFFFF9100) : const Color(0xFF00E5FF));
+                              
+                              // Dynamic breathing intensity linked purely to continuous frame stream
+                              final breath = 0.05 + (math.sin(DateTime.now().millisecondsSinceEpoch / 200) * 0.03);
+
+                              return Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  // 1. ATMOSPHERIC SCREEN VIGNETTE (Pulsing edges hypnotize the periphery!)
+                                  AnimatedContainer(
+                                    duration: const Duration(milliseconds: 100),
+                                    decoration: BoxDecoration(
+                                      gradient: RadialGradient(
+                                        radius: 1.3,
+                                        colors: [
+                                          Colors.transparent,
+                                          comboColor.withOpacity(breath.clamp(0.0, 0.3)),
+                                        ],
+                                        stops: const [0.7, 1.0],
+                                      ),
+                                    ),
+                                  ),
+
+                                  // 2. TOP & BOTTOM "CINEMA BAR" ENERGY TUBES (Visual Drain Framework)
+                                  Positioned(
+                                    top: 0, left: 0, right: 0,
+                                    child: FractionallySizedBox(
+                                      alignment: Alignment.center,
+                                      widthFactor: percent.clamp(0.0, 1.0),
+                                      child: Container(
+                                        height: 3,
+                                        decoration: BoxDecoration(
+                                          color: comboColor,
+                                          boxShadow: [BoxShadow(color: comboColor, blurRadius: 10, spreadRadius: 1)],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    bottom: 0, left: 0, right: 0,
+                                    child: FractionallySizedBox(
+                                      alignment: Alignment.center,
+                                      widthFactor: percent.clamp(0.0, 1.0),
+                                      child: Container(
+                                        height: 3,
+                                        decoration: BoxDecoration(
+                                          color: comboColor,
+                                          boxShadow: [BoxShadow(color: comboColor, blurRadius: 10, spreadRadius: 1)],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+
+                                  // 3. GIGANTIC GHOST BACKGROUND MULTIPLIER
+                                  // Rendered in center, very low opacity so it floats BEHIND focus!
+                                  Opacity(
+                                    opacity: 0.08, // Extremely subtle ghost effect
+                                    child: Transform.scale(
+                                      // Reacts to the timer! Shrinks as combo fades!
+                                      scale: 0.8 + (percent * 0.7), 
+                                      child: Text(
+                                        '${count}X',
+                                        style: TextStyle(
+                                          color: comboColor,
+                                          fontSize: 180,
+                                          fontWeight: FontWeight.w900,
+                                          fontFamily: 'Courier',
+                                          letterSpacing: -10,
+                                          fontStyle: FontStyle.italic,
+                                          shadows: [
+                                            Shadow(color: comboColor, blurRadius: 20)
+                                          ]
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                ),
+              ),
+              
               // --- TOP LEFT: LEVEL INDICATOR (Floating Glass Pill) ---
               Positioned(
                 top: MediaQuery.of(context).padding.top + 16,
@@ -485,7 +602,7 @@ class _HUDMenuState extends State<HUDMenu> with SingleTickerProviderStateMixin {
 
               // --- BOTTOM: MAIN DOCK (Floating Glass Panel) ---
               Positioned(
-                bottom: 35,
+                bottom: 25 + MediaQuery.of(context).padding.bottom,
                 left: 16,
                 right: 16,
                 child: _buildGlassContainer(
@@ -503,7 +620,7 @@ class _HUDMenuState extends State<HUDMenu> with SingleTickerProviderStateMixin {
                           const SizedBox(width: 16),
                           _buildBoosterItem(Icons.build, 'REMOVE', const Color(0xFFFF9800)),
                           const SizedBox(width: 16),
-                          _buildBoosterItem(Icons.auto_fix_high, 'CLEAR', const Color(0xFFFF3D00)),
+                          _buildBoosterItem(Icons.bolt_rounded, 'STORM', const Color(0xFF00E5FF), onTap: widget.game.useRustCleanseBooster),
                         ],
                       ),
                       
@@ -531,6 +648,78 @@ class _HUDMenuState extends State<HUDMenu> with SingleTickerProviderStateMixin {
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
+                            // --- ULTIMATE INTEGRATION: IN-DOCK ENERGY METER ---
+                            // This lives permanently INSIDE the bottom dock reserved area.
+                            // It is mathematically impossible for it to block dynamic objects!
+                            ValueListenableBuilder<double>(
+                              valueListenable: widget.game.comboUpdateNotifier,
+                              builder: (context, percent, _) {
+                                final count = widget.game.comboCount;
+                                final isActive = percent > 0 && count > 1;
+                                final comboColor = count == 1 ? const Color(0xFFFFD600) : 
+                                                  (count == 2 ? const Color(0xFFFF9100) : const Color(0xFF00E5FF));
+                                
+                                return AnimatedContainer(
+                                  duration: const Duration(milliseconds: 250),
+                                  height: isActive ? 14 : 0, // Slides in gracefully!
+                                  margin: EdgeInsets.only(bottom: isActive ? 2 : 0),
+                                  curve: Curves.easeOut,
+                                  child: OverflowBox(
+                                    minHeight: 0,
+                                    maxHeight: 14,
+                                    alignment: Alignment.bottomRight,
+                                    child: AnimatedOpacity(
+                                      duration: const Duration(milliseconds: 200),
+                                      opacity: isActive ? 1.0 : 0.0,
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          // Micro Glowing Icon
+                                          Icon(Icons.bolt_rounded, size: 10, color: comboColor),
+                                          Text(
+                                            '${count}X',
+                                            style: TextStyle(
+                                              color: comboColor,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w900,
+                                              fontFamily: 'Courier',
+                                              shadows: [Shadow(color: comboColor, blurRadius: 5)],
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          // Embedded Nano Tube
+                                          Container(
+                                            width: 55,
+                                            height: 4,
+                                            decoration: BoxDecoration(
+                                              color: Colors.white10,
+                                              borderRadius: BorderRadius.circular(2),
+                                              border: Border.all(color: comboColor.withOpacity(0.3), width: 0.5),
+                                            ),
+                                            clipBehavior: Clip.antiAlias,
+                                            child: Stack(
+                                              children: [
+                                                FractionallySizedBox(
+                                                  alignment: Alignment.centerLeft,
+                                                  widthFactor: percent.clamp(0.0, 1.0),
+                                                  child: Container(
+                                                    decoration: BoxDecoration(
+                                                      gradient: LinearGradient(
+                                                        colors: [comboColor, Colors.white],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
                             Text(
                               '$minutes:$seconds',
                               style: TextStyle(
@@ -606,9 +795,12 @@ class _HUDMenuState extends State<HUDMenu> with SingleTickerProviderStateMixin {
     );
   }
 
-  Widget _buildBoosterItem(IconData icon, String label, Color accentColor) {
+  Widget _buildBoosterItem(IconData icon, String label, Color accentColor, {VoidCallback? onTap}) {
     return GestureDetector(
-      onTap: () => widget.game.audio.playBoosterClick(),
+      onTap: () {
+        widget.game.audio.playBoosterClick();
+        if (onTap != null) onTap();
+      },
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [

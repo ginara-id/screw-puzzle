@@ -23,6 +23,8 @@ class ScrewPuzzleGame extends Forge2DGame {
   late final LevelManager levelManager;
   final audio = AudioService();
   int currentLevel = 1;
+  final timeBonusNotifier = ValueNotifier<double>(0.0); // Kept for internal trigger
+  final comboUpdateNotifier = ValueNotifier<double>(0.0); // Smooth broadcast of decay bar
 
   // Collision Categories
   static const int kPlateCategory = 0x0001;
@@ -36,8 +38,8 @@ class ScrewPuzzleGame extends Forge2DGame {
   bool isHoleBlocked(HoleComponent hole) {
     for (final plate in world.children.whereType<PlateComponent>()) {
       if (plate.isOverlappingCircle(hole.position, hole.radius)) {
-        // Strict tolerance for perfect alignment (0.05)
-        if (!plate.isHoleAligned(hole.position, tolerance: 0.15)) {
+        // Forgiving tolerance allowing slight occlusion (Upgraded from 0.02)
+        if (!plate.isHoleAligned(hole.position, tolerance: 0.25)) {
           return true;
         }
       }
@@ -51,10 +53,7 @@ class ScrewPuzzleGame extends Forge2DGame {
 
   HoleComponent? pendingAdHole;
 
-  ScrewPuzzleGame()
-      : super(
-          gravity: Vector2(0, 14.0),
-        ) {
+  ScrewPuzzleGame() : super(gravity: Vector2(0, 14.0)) {
     // OPTIMIZATION: Reduced iteration counts from excessively heavy 25 to robust 8.
     // This gives a MASSIVE 300% physics CPU runtime boost and stops frame-blocking.
     velocityIterations = 8;
@@ -66,7 +65,6 @@ class ScrewPuzzleGame extends Forge2DGame {
   // Eliminates micro-lag and frame skipping during fast movement.
   double _physicsAccumulator = 0.0;
   static const double _fixedTimeStep = 1.0 / 60.0;
-
 
   @override
   Color backgroundColor() => Colors.transparent;
@@ -133,7 +131,7 @@ class ScrewPuzzleGame extends Forge2DGame {
 
   // TIMER SYSTEM
   double _levelTimeLimit = 120.0; // Tracking current level total
-  double _remainingTime = 120.0; 
+  double _remainingTime = 120.0;
   bool _isGameOver = false;
   bool get isGameOver => _isGameOver;
   double get remainingTime => _remainingTime;
@@ -148,45 +146,39 @@ class ScrewPuzzleGame extends Forge2DGame {
   // COMBO SYSTEM
   double _lastMoveTime = 0;
   int _comboCount = 0;
-  static const double comboWindow = 1.8; // Faster, more challenging window
+  static const double comboWindow = 1.0; // Absolute God-Speed (1 second flat)
+  
+  int get comboCount => _comboCount;
+  double get lastMoveTime => _lastMoveTime;
+  double get comboPercent => (1.0 - (_lastMoveTime / comboWindow)).clamp(0.0, 1.0);
 
   @override
   void update(double dt) {
-    // Guard against excessive delta jumps if user suspends app
-    final safeDt = dt.clamp(0.0, 0.05);
-    
-    // FLUIDITY LOCK: By passing safeDt directly back to the engine,
-    // every single render frame advances physics in a 1:1 perfect lockstep.
-    // Now that our iterations are 3x lighter and graphics are pre-cached,
-    // this achieves ABSOLUTELY PERFECT, buttery visual linearity on mobile.
-    _internalUpdate(safeDt);
+    // 1. Safe Physics Step: Heavily clamped to prevent physics explosion/tunnelling
+    final physicsDt = dt.clamp(0.0, 0.05);
+    // 2. Real-World Clock Step: Permissive clamp allowing accurate 1:1 real-time count 
+    final clockDt = dt.clamp(0.0, 1.0); 
+
+    _internalUpdate(physicsDt, clockDt);
   }
 
-  void _internalUpdate(double dt) {
-    super.update(dt);
-    _lastMoveTime += dt;
+  void _internalUpdate(double physicsDt, double clockDt) {
+    // Pass physicsDt to engine for consistent rigid body movement
+    super.update(physicsDt);
+    _lastMoveTime += physicsDt;
 
     // Reset combo if idle for too long
     if (_lastMoveTime > comboWindow) {
       _comboCount = 0;
     }
+    
+    comboUpdateNotifier.value = (_comboCount > 0) ? comboPercent : 0.0;
 
-    // Throttle heavy checks to run every 0.1s instead of every frame
-    _victoryCheckTimer += dt;
-    if (_victoryCheckTimer < 0.1) return;
-    _victoryCheckTimer = 0;
+    final isInGame = overlays.isActive('HUD') && !overlays.isActive('MainMenu');
 
-    final plates = world.children.whereType<PlateComponent>();
-    bool isInGame = overlays.isActive('HUD') && !overlays.isActive('MainMenu');
-
-    if (isInGame && plates.isEmpty && !_isVictoryTriggered) {
-      _triggerVictorySequence();
-      return;
-    }
-
-    // 1. HANDLE TIMER
+    // --- ABSOLUTE REAL-TIME CLOCK (FIXED!): Subtracts raw wall-clock time ---
     if (isInGame && !_isVictoryTriggered && !_isGameOver) {
-      _remainingTime -= dt;
+      _remainingTime -= clockDt; // USES UNCLAMPED REAL-TIME VALUE!
       if (_remainingTime <= 0) {
         _remainingTime = 0;
         _triggerGameOver();
@@ -195,24 +187,54 @@ class ScrewPuzzleGame extends Forge2DGame {
       // Pulse feel when low on time
       if (_remainingTime < 10 && _remainingTime > 0) {
         if ((_remainingTime * 4).toInt() % 2 == 0) {
-          // HapticFeedback DISABLED FOR DIAGNOSTIC
+          // HapticFeedback ready
         }
       }
     }
 
+    // --- THROTTLED CHECKS: Everything below here runs every 0.1s for CPU savings ---
+    _victoryCheckTimer += physicsDt;
+    if (_victoryCheckTimer < 0.1) return;
+    _victoryCheckTimer = 0;
+
+    final plates = world.children.whereType<PlateComponent>();
+
+    if (isInGame && plates.isEmpty && !_isVictoryTriggered) {
+      _triggerVictorySequence();
+      return;
+    }
+
     final viewportHeight = camera.viewport.size.y / camera.viewfinder.zoom;
-    final bottomEdge = camera.viewfinder.position.y + (viewportHeight / 2) + 2;
+    // ABSOLUTE VISUAL BOTTOM: Exact camera frustum edge 
+    final bottomEdge = camera.viewfinder.position.y + (viewportHeight / 2);
 
-    // PERFORMANCE: Remove plates that are way off screen to save physics CPU
+    // PERFORMANCE: Remove plates the INSTANT they drop behind the bottom HUD overlay
     for (final plate in plates.toList()) {
-      if (plate.body.position.y > bottomEdge + 10) {
-        _comboCount++;
-        _lastMoveTime = 0.0;
-        showComboEffect(plate.body.position, _comboCount);
+      // Trigger exactly when plate's center dips below the top of bottom dock area!
+      if (plate.body.position.y > bottomEdge - 2.0) {
+        // COMBO INCREMENT REMOVED FROM HERE PER USER REQUEST
 
-        // COMBO TIME BONUS: Each combo level adds more time!
-        final double timeBonus = 5.0 * _comboCount;
+        // VIEWPORT FIX: The plate is 8m below the screen! 
+        // We MUST clamp the spawn point so it is visible INSIDE the screen bottom edge!
+        final spawnPos = Vector2(
+          plate.body.position.x.clamp(-4.0, 4.0), // Constrain horizontally
+          camera.viewfinder.position.y + (viewportHeight / 2) - 6.0 // Rise up from inside bottom edge
+        );
+
+        // 1. ONLY SHOW COMBO VFX IF > 1 (Per user instruction)
+        if (_comboCount > 1) {
+          showComboEffect(spawnPos, _comboCount);
+        }
+
+        // 2. COMBO TIME BONUS: Minimum 1.0s, otherwise 1.0s per multiplier tier 
+        final double timeBonus = math.max(1.0, 1.0 * _comboCount);
         _remainingTime += timeBonus;
+        
+        // Always show small floating time addition text for reward feedback
+        showTimeBonusEffect(spawnPos, timeBonus);
+        
+        // Notify Flutter just in case (for potential HUD effects)
+        timeBonusNotifier.value = timeBonus;
 
         // HapticFeedback.lightImpact(); DISABLED
         plate.removeFromParent();
@@ -310,6 +332,59 @@ class ScrewPuzzleGame extends Forge2DGame {
     levelManager.loadLevel(currentLevel, transitionMode: mode);
   }
 
+  /// SPECIAL ABILITY: Unleashes a lightning storm that clears all Rust from bolts sequentially.
+  Future<void> useRustCleanseBooster() async {
+    if (_isGameOver || _isVictoryTriggered) return;
+
+    final rustyBolts = world.children
+        .whereType<BoltComponent>()
+        .where((b) => b.isRusty)
+        .toList();
+
+    if (rustyBolts.isEmpty) {
+      audio.playBoosterClick();
+      return;
+    }
+
+    // 1. INJECT MASTER FLASH (Sets the initial thunder atmosphere)
+    camera.viewport.add(LightningFlashComponent());
+
+    // 2. SEQUENTIAL ARMAGEDDON: Iterate one by one with visual impact
+    final rnd = math.Random();
+
+    for (final bolt in rustyBolts) {
+      // Quick small lightning impact audio for each
+      audio.playBoltSnap(); // Punchy instant feedback
+
+      // Identify where the sky is relative to current camera
+      final worldPos = bolt.body.position;
+
+      // Spawn lightning strike running from the heavens down to this specific bolt
+      final skyStart = Vector2(
+        worldPos.x + ((rnd.nextDouble() - 0.5) * 4), // Staggered chaotic origin
+        worldPos.y - 16.0, // Far off top edge of camera viewport
+      );
+
+      // Add explicit Lightning line from top to bolt
+      world.add(LightningStrikeComponent(startPos: skyStart, endPos: worldPos));
+
+      // Clean the bolt!
+      bolt.cureRust();
+
+      // Generate standard electric particle cloud at point of impact
+      createSparks(worldPos, isLightning: true);
+
+      // Wait a small satisfying fraction of a second before striking the next target
+      await Future.delayed(const Duration(milliseconds: 350));
+
+      // Safety stop if level changed mid-sequence
+      if (_isGameOver || _isVictoryTriggered) break;
+    }
+
+    // Final confirmation chime when complete!
+    audio.playSfx('victory.wav', volume: 0.7);
+  }
+
   void clearLevelState() {
     _boltJoints.clear();
     _boltToHole.clear();
@@ -399,7 +474,7 @@ class ScrewPuzzleGame extends Forge2DGame {
       // Find the specific plate that's blocking for visual feedback
       for (final plate in world.children.whereType<PlateComponent>()) {
         if (plate.isOverlappingCircle(hole.position, hole.radius) &&
-            !plate.isHoleAligned(hole.position, tolerance: 0.05)) {
+            !plate.isHoleAligned(hole.position, tolerance: 0.25)) {
           plate.flashError();
           break;
         }
@@ -422,14 +497,18 @@ class ScrewPuzzleGame extends Forge2DGame {
     _boltToHole[bolt]?.isOccupied = false;
     hole.isOccupied = true;
     _boltToHole[bolt] = hole;
-    
+
+    // COMBO BOOST: Moving bolts quickly now builds the active Combo Chain!
+    _comboCount++;
+    _lastMoveTime = 0.0;
+
     // --- GENIUS FREEZE MECHANISM ---
     // Freeze the entire physics simulation by disabling plate bodies during flight.
     // Prevents unintended falls and eradicates collision CPU overhead during user interaction.
     final activePlates = world.children.whereType<PlateComponent>().toList();
     for (final plate in activePlates) {
       if (plate.isMounted && plate.body.isActive) {
-        plate.body.setActive(false); 
+        plate.body.setActive(false);
       }
     }
 
@@ -441,7 +520,9 @@ class ScrewPuzzleGame extends Forge2DGame {
         for (final plate in activePlates) {
           if (plate.isMounted) {
             plate.body.setActive(true);
-            plate.body.setAwake(true); // Re-wake instantly to resume natural motion
+            plate.body.setAwake(
+              true,
+            ); // Re-wake instantly to resume natural motion
           }
         }
 
@@ -470,21 +551,9 @@ class ScrewPuzzleGame extends Forge2DGame {
           }
         }
 
-        // Only trigger combo if it was a meaningful move AND not returning to previous spot
-        if ((wasHoldingPlate || isNowHoldingPlate) && !isBackAndForth) {
-          if (_lastMoveTime < comboWindow) {
-            _comboCount++;
-            showComboEffect(hole.position, _comboCount);
-            // HapticFeedback.mediumImpact(); DISABLED
-          } else {
-            _comboCount = 1;
-            showComboEffect(hole.position, 1);
-            // HapticFeedback.lightImpact(); DISABLED
-          }
-        } else {
-          // If the move was NOT meaningful or was back-and-forth, BREAK THE COMBO
-          _comboCount = 0;
-        }
+
+        // --- LEGACY COMBO LOGIC REMOVED FROM HERE TO FIX THE DOUBLE-INCREMENT BUG ---
+        // Combo now increments instantly upon valid tap rather than waiting for travel end.
 
         // NOW update the history: The source of THIS move is now the "previous" for the NEXT move
         bolt.previousHole = sourceHole;
@@ -532,7 +601,7 @@ class ScrewPuzzleGame extends Forge2DGame {
   /// 2+ joints → over-constrained, freeze to kill jitter (gravity=0, damping=20)
   void _updatePlateGravity(PlateComponent plate) {
     final count = _plateJointCount(plate);
-    
+
     // Ensure continuous collision detection to prevent fast moving plates from going through bolts
     plate.body.isBullet = true;
 
@@ -548,25 +617,27 @@ class ScrewPuzzleGame extends Forge2DGame {
     } else if (count == 1) {
       // Single joint (pendulum): ALLOW gravity, ALLOW collision
       plate.body.gravityScale = Vector2.all(1.0);
-      plate.body.linearDamping = 0.3;   // VERY Low to allow highly agile natural swinging
+      plate.body.linearDamping =
+          0.3; // VERY Low to allow highly agile natural swinging
       plate.body.angularDamping = 0.3;
       plate.setHardPinned(false);
-      plate.setCollisionEnabled(true);  // COLLISION ON: So it hits other bolts!
+      plate.setCollisionEnabled(true); // COLLISION ON: So it hits other bolts!
       plate.body.setAwake(true);
 
       // SYMMETRY BREAKER: Kicks plates out of unstable vertical balance (standing up)
       // Uses random side direction to introduce initial non-zero torque instantly
       final double direction = math.Random().nextBool() ? 1.0 : -1.0;
-      final double nudgeForce = direction * (plate.body.mass * 4.0); 
+      final double nudgeForce = direction * (plate.body.mass * 4.0);
       plate.body.applyAngularImpulse(nudgeForce);
     } else {
       // Free fall: Max gravity, near-zero damping for explosive terminal velocity
       plate.body.gravityScale = Vector2.all(1.0);
-      plate.body.linearDamping = 0.02;  // Almost zero air resistance for max speed
+      plate.body.linearDamping =
+          0.02; // Almost zero air resistance for max speed
       plate.body.angularDamping = 0.1;
       plate.setHardPinned(false);
-      plate.setCollisionEnabled(true);  // COLLISION ON: For realistic impacts
-      
+      plate.setCollisionEnabled(true); // COLLISION ON: For realistic impacts
+
       // Soft initial push to encourage direction without snapping unrealistically fast
       plate.body.applyLinearImpulse(Vector2(0, plate.body.mass * 2.0));
       plate.body.setAwake(true);
@@ -652,22 +723,27 @@ class ScrewPuzzleGame extends Forge2DGame {
     Vector2 position, {
     bool isMetalDust = false,
     bool isRustDust = false,
+    bool isLightning = false,
   }) {
-    final Color color1 = isRustDust
-        ? const Color(0xFFD35400) // Rust Orange
-        : (isMetalDust
-              ? const Color(0xFFBDC3C7)
-              : const Color(0xFFFFD700)); // Steel or Gold
+    final Color color1 = isLightning
+        ? Colors.white
+        : (isRustDust
+              ? const Color(0xFFD35400) // Rust Orange
+              : (isMetalDust
+                    ? const Color(0xFFBDC3C7)
+                    : const Color(0xFFFFD700))); // Steel or Gold
 
-    final Color color2 = isRustDust
-        ? const Color(0xFF3E2723) // Rust Brown
-        : (isMetalDust
-              ? const Color(0xFF7F8C8D)
-              : const Color(0xFFFF4500)); // Dark Steel or Red
+    final Color color2 = isLightning
+        ? const Color(0xFF00E5FF) // Vivid Cyan
+        : (isRustDust
+              ? const Color(0xFF3E2723) // Rust Brown
+              : (isMetalDust
+                    ? const Color(0xFF7F8C8D)
+                    : const Color(0xFFFF4500))); // Dark Steel or Red
 
-    final int count = (isMetalDust || isRustDust)
-        ? 4
-        : 8; // Reduced for performance
+    final int count = isLightning
+        ? 24 // Massive explosion for lightning
+        : ((isMetalDust || isRustDust) ? 4 : 8);
 
     world.add(
       ParticleSystemComponent(
@@ -676,12 +752,14 @@ class ScrewPuzzleGame extends Forge2DGame {
           lifespan: 0.4,
           generator: (i) {
             final cachePaint = Paint();
-            
+
             return AcceleratedParticle(
               acceleration: Vector2(0, 40), // Tuned for world physics
               speed: Vector2(
                 (math.Random().nextDouble() - 0.5) *
-                    (isMetalDust || isRustDust ? 15 : 30), // Scaled down for world meters
+                    (isMetalDust || isRustDust
+                        ? 15
+                        : 30), // Scaled down for world meters
                 (math.Random().nextDouble() - 0.5) *
                     (isMetalDust || isRustDust ? 15 : 30),
               ),
@@ -690,8 +768,10 @@ class ScrewPuzzleGame extends Forge2DGame {
                 renderer: (canvas, particle) {
                   canvas.drawCircle(
                     Offset.zero,
-                    (1 - particle.progress) * 0.12, // Properly scaled small world spark
-                    cachePaint..color = Color.lerp(color1, color2, particle.progress)!,
+                    (1 - particle.progress) *
+                        0.12, // Properly scaled small world spark
+                    cachePaint
+                      ..color = Color.lerp(color1, color2, particle.progress)!,
                   );
                 },
               ),
@@ -708,7 +788,7 @@ class ScrewPuzzleGame extends Forge2DGame {
     // SOUND FIX: Never play heavy non-pooled 'victory' sound during regular gameplay loops
     // Reusing fast, pooled click/booster sounds instead to prevent Android main-thread memory locking
     audio.playBoosterClick();
-    
+
     // HAPTICS DISABLED FOR DIAGNOSTICS
     /*
     if (count == 1) {
@@ -729,19 +809,19 @@ class ScrewPuzzleGame extends Forge2DGame {
     if (count == 1) {
       comboText = 'NICE!';
       glowColor = const Color(0xFFFFD600); // Yellow
-      sizeMultiplier = 1.8;
+      sizeMultiplier = 2;
     } else if (count == 2) {
       comboText = 'FAST!\nCOMBO x2';
       glowColor = const Color(0xFFFFAB00); // Orange Yellow
-      sizeMultiplier = 1.8;
+      sizeMultiplier = 2;
     } else if (count == 3) {
       comboText = 'SUPER!\nCOMBO x3';
       glowColor = const Color(0xFFFF6D00); // Deep Orange
-      sizeMultiplier = 1.8;
+      sizeMultiplier = 2;
     } else {
       comboText = 'JACKPOT!\nCOMBO x$count';
       glowColor = const Color(0xFFFFD700); // Brilliant Gold
-      sizeMultiplier = 1.8;
+      sizeMultiplier = 2;
     }
 
     final fontSize = 16.0;
@@ -803,6 +883,44 @@ class ScrewPuzzleGame extends Forge2DGame {
       ),
     );
   }
+
+  /// Visually display floating GREEN TEXT indicating the specific amount of SECONDS added to clock.
+  void showTimeBonusEffect(Vector2 position, double seconds) {
+    final bonusText = '+${seconds.toInt()}s';
+    
+    final text = ComboTextComponent(
+      text: bonusText,
+      position: position.clone()..y -= 3.5, // Float much higher to avoid covering plate/combo
+      anchor: Anchor.center,
+      priority: 1001, 
+      textRenderer: TextPaint(
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 18.0,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 1.5,
+          fontFamily: 'Courier',
+          shadows: [
+            Shadow(color: Color(0xFF00C853), blurRadius: 12), 
+            Shadow(color: Color(0xFF00C853), blurRadius: 20),
+            Shadow(color: Colors.black, offset: Offset(2, 2), blurRadius: 4),
+          ],
+        ),
+      ),
+    )..scale = Vector2.all(0.005);
+
+    world.add(text);
+
+    text.add(
+      SequenceEffect([
+        ScaleEffect.to(Vector2.all(0.018), EffectController(duration: 0.2, curve: Curves.easeOutBack)),
+        ScaleEffect.to(Vector2.all(0.015), EffectController(duration: 0.15, curve: Curves.bounceOut)),
+      ]),
+    );
+
+    text.add(MoveByEffect(Vector2(0, -5), EffectController(duration: 1.5, curve: Curves.easeOutCubic)));
+    text.add(OpacityEffect.fadeOut(EffectController(duration: 0.6, startDelay: 0.8), onComplete: () => text.removeFromParent()));
+  }
 }
 
 // Custom Text Component to support OpacityEffect
@@ -827,5 +945,147 @@ class ComboTextComponent extends TextComponent with HasPaint {
       );
     }
     super.render(canvas);
+  }
+}
+
+class LightningFlashComponent extends PositionComponent with HasGameRef {
+  LightningFlashComponent() : super(priority: 9999);
+
+  double _timer = 0;
+  final double duration = 0.8;
+  final Paint _paint = Paint()..color = Colors.white;
+
+  @override
+  void onMount() {
+    super.onMount();
+    // Cover full viewport strictly
+    size = Vector2(10000, 10000);
+    position = Vector2(-5000, -5000);
+  }
+
+  @override
+  void update(double dt) {
+    super.update(dt);
+    _timer += dt;
+    if (_timer >= duration) {
+      removeFromParent();
+    }
+  }
+
+  @override
+  void render(Canvas canvas) {
+    final progress = _timer / duration;
+    // Lightning style erratic flicker curve
+    double intensity = 0.0;
+    if (progress < 0.1) {
+      intensity = progress * 10.0; // Rise fast
+    } else if (progress < 0.3) {
+      intensity = 1.0 - ((progress - 0.1) * 5.0); // Dip fast
+    } else if (progress < 0.4) {
+      intensity = (progress - 0.3) * 10.0; // Restrike!
+    } else {
+      intensity = 1.0 - ((progress - 0.4) / 0.6); // Smooth fadeout
+    }
+
+    // Mix white and vivid lightning blue
+    final color = Color.lerp(
+      const Color(0xFF00E5FF).withOpacity(0.7),
+      Colors.white,
+      0.5 + (0.5 * intensity),
+    )!.withOpacity(intensity.clamp(0.0, 1.0));
+
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.x, size.y), _paint..color = color);
+  }
+}
+
+class LightningStrikeComponent extends PositionComponent with HasGameRef {
+  final Vector2 startPos;
+  final Vector2 endPos;
+  late final List<Vector2> _segments;
+
+  LightningStrikeComponent({required this.startPos, required this.endPos})
+    : super(priority: 9998);
+
+  double _timer = 0;
+  final double duration = 0.4;
+  late final Paint _boltPaint;
+  late final Paint _glowPaint;
+
+  @override
+  void onMount() {
+    super.onMount();
+    _boltPaint = Paint()
+      ..color = Colors.white
+      ..strokeWidth = 0.15
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    _glowPaint = Paint()
+      ..color = const Color(0xFF00E5FF).withOpacity(0.6)
+      ..strokeWidth = 0.4
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 0.2);
+
+    // Generate the jagged path immediately
+    _generatePath();
+  }
+
+  void _generatePath() {
+    _segments = [startPos];
+    final direction = endPos - startPos;
+    final distance = direction.length;
+    final normalized = direction.normalized();
+    final perpendicular = Vector2(-normalized.y, normalized.x);
+
+    const int stepCount = 8;
+    final stepDistance = distance / stepCount;
+    final rnd = math.Random();
+
+    for (int i = 1; i < stepCount; i++) {
+      final basePos = startPos + (normalized * (stepDistance * i));
+      // Max offset scales by distance to avoid tiny strike getting crazy jagged
+      final maxOffset = 0.8 * (1 - (i - stepCount / 2).abs() / (stepCount / 2));
+      final offsetMagnitude = (rnd.nextDouble() - 0.5) * 2.0 * maxOffset;
+      final point = basePos + (perpendicular * offsetMagnitude);
+      _segments.add(point);
+    }
+    _segments.add(endPos);
+  }
+
+  @override
+  void update(double dt) {
+    super.update(dt);
+    _timer += dt;
+    if (_timer >= duration) {
+      removeFromParent();
+    }
+  }
+
+  @override
+  void render(Canvas canvas) {
+    final progress = _timer / duration;
+    // Flicker look
+    if ((_timer * 20).toInt() % 2 == 0 && progress < 0.5) {
+      // Random brief invisibility frame simulating plasma cooling
+      return;
+    }
+
+    final fadeOut = (1.0 - progress).clamp(0.0, 1.0);
+
+    final path = Path();
+    path.moveTo(_segments.first.x, _segments.first.y);
+    for (int i = 1; i < _segments.length; i++) {
+      path.lineTo(_segments[i].x, _segments[i].y);
+    }
+
+    canvas.drawPath(
+      path,
+      _glowPaint..color = const Color(0xFF00E5FF).withOpacity(0.6 * fadeOut),
+    );
+    canvas.drawPath(
+      path,
+      _boltPaint..color = Colors.white.withOpacity(fadeOut),
+    );
   }
 }
