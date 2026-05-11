@@ -32,7 +32,8 @@ class LevelManager {
 
     final dynamic data = jsonDecode(content);
 
-    game.showSteamTransition(() async {
+    game.showSteamTransition(
+      () async {
       try {
         // 1. Clear previous world data
         game.world.removeAll(game.world.children);

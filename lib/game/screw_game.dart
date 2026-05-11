@@ -297,11 +297,11 @@ class ScrewPuzzleGame extends Forge2DGame {
     );
   }
 
-  void resetLevel() {
+  void resetLevel({TransitionMode mode = TransitionMode.closeAndOpen}) {
     _isVictoryTriggered = false;
     _isGameOver = false;
     _remainingTime = 60.0;
-    levelManager.loadLevel(currentLevel);
+    levelManager.loadLevel(currentLevel, transitionMode: mode);
   }
 
   void clearLevelState() {

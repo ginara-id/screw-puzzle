@@ -503,7 +503,7 @@ class _HUDMenuState extends State<HUDMenu> with SingleTickerProviderStateMixin {
                           const SizedBox(width: 16),
                           _buildBoosterItem(Icons.build, 'REMOVE', const Color(0xFFFF9800)),
                           const SizedBox(width: 16),
-                          _buildBoosterItem(Icons.auto_fix_high, 'CLEAR', const Color(0xFFE040FB)),
+                          _buildBoosterItem(Icons.auto_fix_high, 'CLEAR', const Color(0xFFFF3D00)),
                         ],
                       ),
                       
@@ -581,9 +581,9 @@ class _HUDMenuState extends State<HUDMenu> with SingleTickerProviderStateMixin {
         child: Container(
           padding: padding,
           decoration: BoxDecoration(
-            color: const Color(0xFF0A1128).withOpacity(0.45), // Deep space blue tint
+            color: const Color(0xFF1A1A1A).withOpacity(0.65), // Rich carbon graphite tint
             borderRadius: borderRadius,
-            border: Border.all(color: Colors.white.withOpacity(0.15), width: 1.0), // Hairline highlight
+            border: Border.all(color: Colors.white.withOpacity(0.12), width: 1.2), // Hairline highlight
             boxShadow: [
               BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 30, spreadRadius: -5),
               BoxShadow(color: const Color(0xFFFFD600).withOpacity(0.05), blurRadius: 20, spreadRadius: 5), // Cyan ambient glow
@@ -742,9 +742,9 @@ class _MainMenuState extends State<MainMenu>
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFF0F171E), // Near Black
-              Color(0xFF1C2833), // Deep Charcoal
-              Color(0xFF151922), // Dark Navy/Charcoal
+              Color(0xFF121212), // Pure Iron Charcoal
+              Color(0xFF1F1F1F), // Warm Smelter Grey
+              Color(0xFF161616), // Hard Iron Ground
             ],
           ),
         ),
@@ -856,7 +856,7 @@ class _MainMenuState extends State<MainMenu>
               ),
               _buildGlassIconButton(
                 icon: Icons.settings_outlined,
-                onPressed: () {},
+                onPressed: () => widget.game.overlays.add('SettingsMenu'),
               ),
             ],
           ),
@@ -976,15 +976,9 @@ class _MainMenuState extends State<MainMenu>
           child: _ModernPlayButton(
             level: widget.game.currentLevel,
             onPressed: () {
-              widget.game.resetLevel();
+              widget.game.resetLevel(mode: TransitionMode.openOnly);
               widget.game.overlays.remove('MainMenu');
               widget.game.overlays.add('HUD');
-              widget.game.camera.viewport.add(
-                IndustrialTransitionComponent(
-                  mode: TransitionMode.openOnly,
-                  onHalfway: () async {},
-                ),
-              );
             },
           ),
         ),
@@ -1199,15 +1193,9 @@ class _ModernJourneyNode extends StatelessWidget {
         onTap: isUnlocked
             ? () {
                 game.currentLevel = level;
-                game.resetLevel();
+                game.resetLevel(mode: TransitionMode.openOnly);
                 game.overlays.remove('MainMenu');
                 game.overlays.add('HUD');
-                game.camera.viewport.add(
-                  IndustrialTransitionComponent(
-                    mode: TransitionMode.openOnly,
-                    onHalfway: () async {},
-                  ),
-                );
               }
             : null,
         child: Container(
@@ -1277,9 +1265,9 @@ class _BoltNodePainter extends CustomPainter {
         colors: isUnlocked
             ? (isCurrent
                   ? [
-                      const Color(0xFF84FFFF), // Light Cyan
-                      const Color(0xFFFFD600), // Pure Cyan
-                      const Color(0xFF006064), // Dark Teal
+                      const Color(0xFFFFD180), // Bright Warm Amber highlight
+                      const Color(0xFFFFAB00), // Pure Rich Gold Ember
+                      const Color(0xFFE65100), // Deep Furnace Base
                     ]
                   : [
                       const Color(0xFF8D8D8D),
@@ -1502,13 +1490,13 @@ class _ModernPlayButton extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(35),
           gradient: const LinearGradient(
-            colors: [Color(0xFFFFAB00), Color(0xFFFFD600)], // Modern Cyan Gradient
+            colors: [Color(0xFFFF3D00), Color(0xFFFFAB00)], // Harmonized Heat Gradient
             begin: Alignment.centerLeft,
             end: Alignment.centerRight,
           ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFFFD600).withOpacity(0.3), // Cyan Glow
+              color: const Color(0xFFFFD600).withOpacity(0.3), // Warm Glow
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -1520,10 +1508,9 @@ class _ModernPlayButton extends StatelessWidget {
           child: Stack(
             children: [
               Positioned.fill(
-                child: Opacity(
-                  opacity: 0.2,
-                  child: CustomPaint(painter: _ButtonPatternPainter()),
-                ),
+                  child: CustomPaint(
+                    painter: _ButtonPatternPainter(),
+                  ),
               ),
               Center(
                 child: Row(
@@ -1537,7 +1524,7 @@ class _ModernPlayButton extends StatelessWidget {
                       ),
                       child: const Icon(
                         Icons.play_arrow_rounded,
-                        color: Color(0xFFFFAB00), // Deep Cyan Icon
+                        color: Color(0xFFFF3D00), // Warm Heat Icon
                         size: 24,
                       ),
                     ),
@@ -1567,7 +1554,7 @@ class _ButtonPatternPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white
+      ..color = Colors.white.withOpacity(0.2) // Handled directly in painter for Impeller stability
       ..strokeWidth = 1;
     for (double i = 0; i < size.width; i += 10) {
       canvas.drawLine(Offset(i, 0), Offset(i - 20, size.height), paint);
@@ -1784,6 +1771,245 @@ class LoadingOverlay extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ==========================================
+// MASTER SYSTEM CONFIGURATION OVERLAY
+// ==========================================
+class SettingsMenu extends StatefulWidget {
+  final ScrewPuzzleGame game;
+  const SettingsMenu({super.key, required this.game});
+
+  @override
+  State<SettingsMenu> createState() => _SettingsMenuState();
+}
+
+class _SettingsMenuState extends State<SettingsMenu> {
+  bool _soundEnabled = true;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        // 1. Heavy Dimensional Frost Backdrop
+        Positioned.fill(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+            child: Container(
+              color: Colors.black.withOpacity(0.75),
+            ),
+          ),
+        ),
+        // 2. Kinetic Dialog Body
+        Center(
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.8, end: 1.0),
+            duration: const Duration(milliseconds: 350),
+            curve: Curves.easeOutBack,
+            builder: (context, scale, child) => Transform.scale(scale: scale, child: child),
+            child: Container(
+              width: 330,
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    const Color(0xFFFF9800).withOpacity(0.6),
+                    const Color(0xFF1A1A1A),
+                    const Color(0xFFFF9800).withOpacity(0.2),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.8),
+                    blurRadius: 40,
+                    spreadRadius: 10,
+                  )
+                ],
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF141414), // Pure industrial dark
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // HEADER
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'SYSTEM CONFIG',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            fontFamily: 'Courier',
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => widget.game.overlays.remove('SettingsMenu'),
+                          icon: const Icon(Icons.close_rounded, color: Colors.white60),
+                        ),
+                      ],
+                    ),
+                    const Divider(color: Colors.white10, height: 1),
+                    const SizedBox(height: 24),
+
+                    // SETTINGS CATEGORY 1: SOUND
+                    _buildSettingsHeader('MODULE CONTROLS'),
+                    const SizedBox(height: 8),
+                    _buildToggleItem(
+                      icon: Icons.volume_up_rounded,
+                      title: 'SYSTEM AUDIO',
+                      subtitle: 'Music & VFX output',
+                      value: _soundEnabled,
+                      onChanged: (val) {
+                        setState(() => _soundEnabled = val);
+                        // Triggers background routing loop logic
+                        widget.game.audio.playBoosterClick(); 
+                      },
+                    ),
+
+                    const SizedBox(height: 24),
+                    const Divider(color: Colors.white10, height: 1),
+                    const SizedBox(height: 24),
+
+                    // SETTINGS CATEGORY 2: LEGAL & INFO
+                    _buildSettingsHeader('DOCUMENTATION'),
+                    const SizedBox(height: 8),
+                    _buildNavTile(
+                      icon: Icons.privacy_tip_outlined,
+                      title: 'PRIVACY POLICY',
+                    ),
+                    _buildNavTile(
+                      icon: Icons.article_outlined,
+                      title: 'TERMS OF SERVICE',
+                    ),
+                    _buildNavTile(
+                      icon: Icons.info_outline_rounded,
+                      title: 'ABOUT ENGINE',
+                    ),
+
+                    const SizedBox(height: 32),
+                    
+                    // FOOTER TELEMETRY
+                    Text(
+                      'SECURE VERSION: 1.0.5-BETA',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.2),
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'monospace',
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSettingsHeader(String label) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Text(
+        label,
+        style: TextStyle(
+          color: const Color(0xFFFF9800).withOpacity(0.8),
+          fontSize: 10,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 2,
+          fontFamily: 'Courier',
+        ),
+      ),
+    );
+  }
+
+  Widget _buildToggleItem({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.white70, size: 20),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                Text(
+                  subtitle,
+                  style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeColor: const Color(0xFFFF9800),
+            activeTrackColor: const Color(0xFFFF9800).withOpacity(0.3),
+            inactiveThumbColor: Colors.grey[700],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNavTile({required IconData icon, required String title}) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {}, // Setup external URLs here in the future
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 8.0),
+          child: Row(
+            children: [
+              Icon(icon, color: Colors.white38, size: 18),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Courier',
+                  ),
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: Colors.white24, size: 20),
+            ],
+          ),
         ),
       ),
     );
