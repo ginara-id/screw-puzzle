@@ -106,8 +106,8 @@ class LevelManager {
           // endPadding: gap from hole edge to the 'tips' of the plate.
           // sidePadding: gap from hole edge to the 'sides' (thickness) of the plate.
           const holeRadius = 0.35;
-          const endPadding = 0.45;
-          const sidePadding = 0.10;
+          const endPadding = 0.18;
+          const sidePadding = 0.12;
 
           double minWidth, minHeight;
           if (maxAbsX == 0 && maxAbsY == 0) {
@@ -170,7 +170,7 @@ class LevelManager {
             if (bolt != null) {
               game.createJoint(bolt, plate);
             }
-            plate.addHole(hole.position);
+            plate.addHole(worldPos);
           }
         }
       } catch (e) {

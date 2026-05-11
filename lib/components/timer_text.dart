@@ -5,6 +5,13 @@ import '../game/screw_game.dart';
 class TimerTextComponent extends PositionComponent with HasGameRef<ScrewPuzzleGame> {
   late final TextComponent _textComponent;
   
+  // PRE-CACHED PAINTS: Prevents per-frame Object construction in UI thread
+  late final TextPaint _normalPaint;
+  late final TextPaint _emergencyPaint;
+  
+  String _lastText = "";
+  bool _wasEmergency = false;
+
   // Set an extremely high priority so it's never obstructed
   TimerTextComponent() : super(priority: 9999);
 
@@ -12,12 +19,36 @@ class TimerTextComponent extends PositionComponent with HasGameRef<ScrewPuzzleGa
   Future<void> onLoad() async {
     await super.onLoad();
     
-    // Positioned safely at the TOP CENTER
+    // Cache both paint objects ONCE rather than allocating per frame!
+    _normalPaint = TextPaint(
+      style: const TextStyle(
+        color: Color(0xFF00FF41), // Matrix/Industrial Green
+        fontSize: 28,
+        fontWeight: FontWeight.w900,
+        fontFamily: 'Courier New',
+        letterSpacing: 2.0,
+        shadows: [Shadow(color: Color(0xFF00FF41), blurRadius: 10)],
+      ),
+    );
+
+    _emergencyPaint = TextPaint(
+      style: const TextStyle(
+        color: Color(0xFFFF3333), // Bright Warning Red
+        fontSize: 28,
+        fontWeight: FontWeight.w900,
+        fontFamily: 'Courier New',
+        letterSpacing: 2.0,
+        shadows: [
+          Shadow(color: Color(0xFFFF3333), blurRadius: 15),
+          Shadow(color: Colors.black, offset: Offset(2, 2), blurRadius: 2),
+        ],
+      ),
+    );
+    
     size = Vector2(140, 50);
     position = Vector2(gameRef.canvasSize.x / 2, 60);
     anchor = Anchor.center;
 
-    // 1. Outer Metallic Frame
     add(RectangleComponent(
       size: size,
       paint: Paint()
@@ -28,7 +59,6 @@ class TimerTextComponent extends PositionComponent with HasGameRef<ScrewPuzzleGa
         ).createShader(size.toRect()),
     ));
 
-    // 2. Inner Dark Glass Screen
     final innerSize = size - Vector2.all(8);
     add(RectangleComponent(
       size: innerSize,
@@ -38,23 +68,11 @@ class TimerTextComponent extends PositionComponent with HasGameRef<ScrewPuzzleGa
         ..style = PaintingStyle.fill,
     ));
 
-    // 3. Digital Text
     _textComponent = TextComponent(
       text: '00:00',
       anchor: Anchor.center,
-      position: size / 2, // Centered inside the frame
-      textRenderer: TextPaint(
-        style: const TextStyle(
-          color: Color(0xFF00FF41), // Matrix/Industrial Green
-          fontSize: 28,
-          fontWeight: FontWeight.w900,
-          fontFamily: 'Courier New',
-          letterSpacing: 2.0,
-          shadows: [
-            Shadow(color: Color(0xFF00FF41), blurRadius: 10),
-          ],
-        ),
-      ),
+      position: size / 2, 
+      textRenderer: _normalPaint,
     );
     add(_textComponent);
   }
@@ -65,42 +83,31 @@ class TimerTextComponent extends PositionComponent with HasGameRef<ScrewPuzzleGa
     
     final time = gameRef.remainingTime;
     final minutes = (time / 60).floor();
-    final seconds = (time % 60).floor();
+    final seconds = (time % 60).floor().clamp(0, 59);
     final mStr = minutes.toString().padLeft(2, '0');
     final sStr = seconds.toString().padLeft(2, '0');
+    final currentText = '$mStr:$sStr';
     
-    _textComponent.text = '$mStr:$sStr';
+    // 1. ONLY update text geometry if numeric value changed (reduces allocation by 60x)
+    if (_lastText != currentText) {
+      _textComponent.text = currentText;
+      _lastText = currentText;
+    }
 
-    // Emergency State
-    if (time < 10 && time > 0) {
-      _textComponent.textRenderer = TextPaint(
-        style: const TextStyle(
-          color: Color(0xFFFF3333), // Bright Warning Red
-          fontSize: 28,
-          fontWeight: FontWeight.w900,
-          fontFamily: 'Courier New',
-          letterSpacing: 2.0,
-          shadows: [
-            Shadow(color: Color(0xFFFF3333), blurRadius: 15),
-            Shadow(color: Colors.black, offset: Offset(2, 2), blurRadius: 2),
-          ],
-        ),
-      );
-      // Gentle pulse on the text
+    final bool isEmergency = (time < 10 && time > 0);
+    
+    // 2. Emergency Pulsing is okay as it uses double math, not object allocation
+    if (isEmergency) {
       _textComponent.scale = Vector2.all(1.0 + (0.05 * (time * 4).toInt() % 2));
-    } else {
-      // Revert style if time bonus puts it back over 10
-      _textComponent.scale = Vector2.all(1.0);
-      _textComponent.textRenderer = TextPaint(
-        style: const TextStyle(
-          color: Color(0xFF00FF41),
-          fontSize: 28,
-          fontWeight: FontWeight.w900,
-          fontFamily: 'Courier New',
-          letterSpacing: 2.0,
-          shadows: [Shadow(color: Color(0xFF00FF41), blurRadius: 10)],
-        ),
-      );
+    }
+
+    // 3. ONLY swap renderers IF the state transition boundary is crossed
+    if (isEmergency != _wasEmergency) {
+      _wasEmergency = isEmergency;
+      _textComponent.textRenderer = isEmergency ? _emergencyPaint : _normalPaint;
+      if (!isEmergency) {
+        _textComponent.scale = Vector2.all(1.0);
+      }
     }
   }
 }

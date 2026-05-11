@@ -21,26 +21,31 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
   late final Paint _shadowPaint = Paint();
   late final Paint _headPaint = Paint();
   late final Paint _rustTexturePaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.03
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 0.02);
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 0.03
+    ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 0.02);
   late final Paint _crackPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.02;
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 0.02;
   late final Paint _rimHighlight = Paint()
-      ..color = Colors.white.withOpacity(0.4)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.02;
+    ..color = Colors.white.withOpacity(0.4)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 0.02;
   late final Paint _slotPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
+    ..style = PaintingStyle.stroke
+    ..strokeCap = StrokeCap.round;
   late final Paint _shadowSlotPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 0.02);
+    ..style = PaintingStyle.stroke
+    ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 0.02);
 
   Shader? _cachedHeadShader;
   Shader? _cachedSlotShader;
   int? _lastHashState; // Detects changes to invalidate shader
+  Path? _cachedCrackPath; // Cached procedurally generated rust cracks
+
+  // Pre-cached Blur Filters for zero-allocation shadow runtime
+  static final _blurLifted = MaskFilter.blur(BlurStyle.normal, 0.2);
+  static final _blurNormal = MaskFilter.blur(BlurStyle.normal, 0.08);
 
   BoltComponent({
     required this.initialPosition,
@@ -52,9 +57,23 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
   void shake() {
     add(
       SequenceEffect([
-        MoveByEffect(Vector2(0.05, 0), EffectController(duration: 0.05, reverseDuration: 0.05, repeatCount: 1)),
-        MoveByEffect(Vector2(-0.05, 0), EffectController(duration: 0.05, reverseDuration: 0.05, repeatCount: 1)),
-      ])
+        MoveByEffect(
+          Vector2(0.05, 0),
+          EffectController(
+            duration: 0.05,
+            reverseDuration: 0.05,
+            repeatCount: 1,
+          ),
+        ),
+        MoveByEffect(
+          Vector2(-0.05, 0),
+          EffectController(
+            duration: 0.05,
+            reverseDuration: 0.05,
+            repeatCount: 1,
+          ),
+        ),
+      ]),
     );
   }
 
@@ -65,8 +84,12 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
     priority = value ? 100 : 3;
 
     // Safely remove existing effects to prevent concurrent modification or overlap
-    children.whereType<ScaleEffect>().toList().forEach((e) => e.removeFromParent());
-    children.whereType<RotateEffect>().toList().forEach((e) => e.removeFromParent());
+    children.whereType<ScaleEffect>().toList().forEach(
+      (e) => e.removeFromParent(),
+    );
+    children.whereType<RotateEffect>().toList().forEach(
+      (e) => e.removeFromParent(),
+    );
 
     if (value) {
       add(
@@ -78,7 +101,7 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
       // Spin once when lifted
       add(
         RotateEffect.by(
-          pi * 2, 
+          pi * 2,
           EffectController(duration: 0.3, curve: Curves.easeOut),
         ),
       );
@@ -142,7 +165,7 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
     // Configure reusable shadow paint
     _shadowPaint
       ..color = Colors.black.withOpacity(isLifted ? 0.6 : 0.5)
-      ..maskFilter = MaskFilter.blur(BlurStyle.normal, blurIntensity);
+      ..maskFilter = isLifted ? _blurLifted : _blurNormal;
 
     canvas.drawCircle(shadowOffset, radius, _shadowPaint);
 
@@ -151,14 +174,22 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
 
     // SMART SHADER CACHE: Check hash to see if rusty progression changed
     final int currentStateHash = (isRusty ? 1000 : 0) + hitsRemaining;
-    
+
     if (_cachedHeadShader == null || _lastHashState != currentStateHash) {
       _lastHashState = currentStateHash;
-      
+
       final progress = isRusty ? (hitsRemaining / 5.0) : 0.0;
-      final rustColors = [const Color(0xFFD35400), const Color(0xFF8E44AD), const Color(0xFF3E2723)];
-      final cleanColors = [const Color(0xFFFFEB3B), const Color(0xFFFBC02D), const Color(0xFFF9A825)];
-      
+      final rustColors = [
+        const Color(0xFFD35400),
+        const Color(0xFF8E44AD),
+        const Color(0xFF3E2723),
+      ];
+      final cleanColors = [
+        const Color(0xFFFFEB3B),
+        const Color(0xFFFBC02D),
+        const Color(0xFFF9A825),
+      ];
+
       // Manual lerp to avoid List.generate dynamic lists memory footprint
       final colors = [
         Color.lerp(cleanColors[0], rustColors[0], progress)!,
@@ -178,6 +209,26 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
         end: Alignment.bottomRight,
         colors: [Colors.black, const Color(0xFF2C3E50)],
       ).createShader(rect);
+
+      // PRECOMPUTE CRACKS OPTIMIZATION:
+      // Construct geometry ONLY when hitsRemaining changes! Never perform Trigonometry per-frame.
+      if (isRusty && hitsRemaining < 5) {
+        final newCrackPath = Path();
+        final fixedSeed = initialPosition.x.toInt() ^ initialPosition.y.toInt();
+        final staticRandom = Random(fixedSeed);
+
+        for (var i = 0; i < (5 - hitsRemaining) * 3; i++) {
+          final double angle = staticRandom.nextDouble() * pi * 2;
+          final double r1 = staticRandom.nextDouble() * radius;
+          final double r2 = r1 + 0.2;
+
+          newCrackPath.moveTo(cos(angle) * r1, sin(angle) * r1);
+          newCrackPath.lineTo(cos(angle + 0.2) * r2, sin(angle + 0.2) * r2);
+        }
+        _cachedCrackPath = newCrackPath;
+      } else {
+        _cachedCrackPath = null;
+      }
     }
 
     _headPaint.shader = _cachedHeadShader;
@@ -191,26 +242,16 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
     // 3. Rust Layer optimization
     if (isRusty) {
       final progress = hitsRemaining / 5.0;
-      canvas.drawCircle(Offset.zero, radius * 0.7, _rustTexturePaint..color = Colors.black.withOpacity(0.3 * progress));
+      canvas.drawCircle(
+        Offset.zero,
+        radius * 0.7,
+        _rustTexturePaint..color = Colors.black.withOpacity(0.3 * progress),
+      );
       canvas.drawCircle(Offset.zero, radius * 0.4, _rustTexturePaint);
 
-      if (hitsRemaining < 5) {
-        // Draw cracks without recreating Random seed generators and complex logic inside rendering loop
+      if (_cachedCrackPath != null) {
         _crackPaint.color = Colors.black.withOpacity(0.4 * (1 - progress));
-        
-        // Seed fixed once based on position so it does not re-randomize and dance every frame causing redraw stress
-        final fixedSeed = initialPosition.x.toInt() ^ initialPosition.y.toInt();
-        final staticRandom = Random(fixedSeed);
-        for (var i = 0; i < (5 - hitsRemaining) * 3; i++) {
-          final angle = staticRandom.nextDouble() * pi * 2;
-          final r1 = staticRandom.nextDouble() * radius;
-          final r2 = r1 + 0.2;
-          canvas.drawLine(
-            Offset(cos(angle) * r1, sin(angle) * r1),
-            Offset(cos(angle + 0.2) * r2, sin(angle + 0.2) * r2),
-            _crackPaint,
-          );
-        }
+        canvas.drawPath(_cachedCrackPath!, _crackPaint);
       }
     }
 
@@ -218,8 +259,9 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
     canvas.drawCircle(Offset.zero, radius * 0.95, _rimHighlight);
 
     // 5. Slot Painting Optimization
-    final isTorx = (initialPosition.x.toInt() + initialPosition.y.toInt()) % 5 == 0;
-    
+    final isTorx =
+        (initialPosition.x.toInt() + initialPosition.y.toInt()) % 5 == 0;
+
     _slotPaint.shader = _cachedSlotShader;
     _slotPaint.strokeWidth = isTorx ? 0.08 : 0.12;
     _shadowSlotPaint.color = Colors.black.withOpacity(0.5);
@@ -243,7 +285,11 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
           p,
         );
       }
-      canvas.drawCircle(Offset.zero, radius * 0.15, p..style = PaintingStyle.fill);
+      canvas.drawCircle(
+        Offset.zero,
+        radius * 0.15,
+        p..style = PaintingStyle.fill,
+      );
       p.style = PaintingStyle.stroke; // restore after fill
     }
 
@@ -268,7 +314,8 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
 
     final shape = CircleShape()..radius = radius;
     final fixtureDef = FixtureDef(shape)
-      ..friction = 0.7 // Balanced grip for both impact and resting
+      ..friction =
+          0.7 // Balanced grip for both impact and resting
       ..restitution = 0.0
       ..filter.categoryBits = ScrewPuzzleGame.kBoltHoleCategory
       ..filter.maskBits = ScrewPuzzleGame.kPlateCategory; // Solid by default
@@ -295,7 +342,7 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
 
     // Reset visual offset to zero (start)
     _visualOffset.position = Vector2.zero();
-    
+
     // Ensure the visual offset component is added
     if (_visualOffset.parent == null) add(_visualOffset);
 
@@ -303,16 +350,16 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
     _visualOffset.add(
       MoveToEffect(
         targetOffset,
-        EffectController(duration: 0.35, curve: Curves.easeInOutCubic),
+        EffectController(duration: 0.2, curve: Curves.easeOutQuad),
         onComplete: () {
           // SEAMLESS HANDOVER:
           // 1. Teleport the physics body to the target hole
           // Keep the current rotation to avoid snapping
           body.setTransform(target, body.angle);
-          
+
           // 2. Reset the visual offset to zero
           _visualOffset.position = Vector2.zero();
-          
+
           // 3. Finalize
           _updateCollision(true);
           isLifted = false;

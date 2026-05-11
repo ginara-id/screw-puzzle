@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flame/components.dart';
 import 'package:flame/particles.dart';
 import 'package:flame_forge2d/flame_forge2d.dart' hide Particle;
@@ -23,6 +24,7 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
   final List<Vector2> _localHoles = [];
   double _glintTimer = Random().nextDouble() * 3.0;
   bool _isHardPinned = false; // true when held by 2+ joints
+  int _activeContacts = 0; // Counts current active collision touching state
 
   /// Called by ScrewGame to freeze/unfreeze this plate
   void setHardPinned(bool value) => _isHardPinned = value;
@@ -33,11 +35,11 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
     for (final fixture in body.fixtures) {
       final filter = fixture.filterData; // get current
       filter.maskBits = enabled ? ScrewPuzzleGame.kBoltHoleCategory : 0;
-      fixture.filterData = filter; // reassign → triggers world.refilter() internally
+      fixture.filterData =
+          filter; // reassign → triggers world.refilter() internally
     }
   }
 
-  
   // CACHED PAINTS & SHADERS for performance
   late final Paint _shadowPaint;
   late final Paint _surfacePaint;
@@ -50,19 +52,33 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
   Shader? _surfaceShader;
   Shader? _glintShader;
 
-
-
   List<Vector2> get localHoles => List.unmodifiable(_localHoles);
 
   void addHole(Vector2 worldPos) {
-    final localPos = body.isActive
-        ? body.localPoint(worldPos)
-        : worldPos - initialPosition;
+    // SAFETY FALLBACK: During synchronous object initialization, Forge2D internal transform grids
+    // might not have fully committed the body's initial position state. 
+    // Using static raw math subtraction (worldPos - initialPosition) is 100% robust 
+    // and guarantees pixel-perfect coordinate consistency before physics ticking begins.
+    final localPos = (body.angle.abs() < 0.001)
+        ? (worldPos - initialPosition)
+        : body.localPoint(worldPos);
 
-    bool exists = _localHoles.any((h) => (h - localPos).length < 0.2);
-    if (!exists) {
+    // MICRO-ALIGNMENT SNAP: Scan for any existing hole close to the new position.
+    final existingIndex = _localHoles.indexWhere((h) => (h - localPos).length < 0.35);
+    
+    if (existingIndex >= 0) {
+      // If a slight offset exists due to runtime physics drift, forcefully update 
+      // the hole's internal coordinates to EXACTLY match the current bolt placement.
+      // This mathematically guarantees the user NEVER sees an off-center metallic lip overlap!
+      final double dist = (_localHoles[existingIndex] - localPos).length;
+      if (dist > 0.01) {
+        _localHoles[existingIndex] = localPos;
+        _buildCachedPath(); 
+      }
+    } else {
+      // Found a truly new position! Add new geometry and rebuild the picture cache
       _localHoles.add(localPos);
-      _buildCachedPath(); // Refresh the visual path to show the new hole
+      _buildCachedPath();
     }
   }
 
@@ -71,21 +87,22 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
     _errorFlashTimer = 0.5;
   }
 
+  Picture? _cachedPlatePicture; // HOLY GRAIL CACHE: Holds the entire static visuals
   late Path _platePath;
 
   @override
   Future<void> onLoad() async {
     await super.onLoad();
     priority = 2;
-    _buildCachedPath();
-    _initPaints();
+    _initPaints(); // Initialize paint system first
+    _buildCachedPath(); // Then use the paints for pre-recording
   }
 
   void _initPaints() {
     _shadowPaint = Paint()..color = Colors.black.withOpacity(0.3);
-    
+
     _surfacePaint = Paint();
-    
+
     _borderPaint = Paint()
       ..color = Colors.black.withOpacity(0.3)
       ..style = PaintingStyle.stroke
@@ -106,8 +123,7 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.02;
 
-    _glintPaint = Paint()
-      ..blendMode = BlendMode.screen;
+    _glintPaint = Paint()..blendMode = BlendMode.screen;
   }
 
   void _buildCachedPath() {
@@ -122,11 +138,14 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
     if (shapeType == PlateShape.circle) {
       mainPath = Path()
         ..addOval(Rect.fromCircle(center: Offset.zero, radius: radius));
-    } else if (shapeType == PlateShape.triangle) {
+    } else    if (shapeType == PlateShape.triangle) {
+      // CENTROID CENTERING FIX: Moving the visual path origin to match 
+      // the mathematical mass-centroid (Top vertex at -2/3 Height, Base at 1/3 Height).
+      // This prevents Forge2D physics from applying auto-corrective shifts that break hole alignment.
       mainPath = Path()
-        ..moveTo(0, -size.y / 2)
-        ..lineTo(-size.x / 2, size.y / 2)
-        ..lineTo(size.x / 2, size.y / 2)
+        ..moveTo(0, -size.y * (2/3))
+        ..lineTo(-size.x / 2, size.y / 3)
+        ..lineTo(size.x / 2, size.y / 3)
         ..close();
     } else {
       mainPath = Path()..addRect(rect);
@@ -134,14 +153,45 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
 
     final holesPath = Path();
     for (final localPos in _localHoles) {
-      // Use exact radius as defined in gameplay logic
       holesPath.addOval(
         Rect.fromCircle(center: Offset(localPos.x, localPos.y), radius: 0.40),
       );
     }
 
-    // Precalculate the complex shape once, saving massive amounts of GPU memory
+    // 1. Precalculate complex Path geometry first
     _platePath = Path.combine(PathOperation.difference, mainPath, holesPath);
+
+    // 2. NEW MASTER OPTIMIZATION: Pre-Record entire static visual look to GPU
+    final recorder = PictureRecorder();
+    final canvas = Canvas(recorder);
+
+    // Pre-generate shader matching current size boundaries
+    _surfacePaint.shader = LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: const [Color(0xFF424242), Color(0xFF616161), Color(0xFF212121)],
+      stops: const [0.0, 0.5, 1.0],
+    ).createShader(rect);
+
+    // Record Part A: Base Surface Gradient
+    canvas.drawPath(_platePath, _surfacePaint);
+
+    // Record Part B: Scratches & Wear details
+    canvas.drawLine(
+      Offset(-size.x / 2.2, size.y / 4),
+      Offset(size.x / 4, -size.y / 3),
+      _scratchPaint,
+    );
+
+    // Record Part C: EXTERIOR BORDER ONLY.
+    // Re-routing to mainPath draws outlines purely around the outer perimeter, 
+    // satisfying user demand to remove noisy borders from the hole interiors.
+    canvas.drawPath(mainPath, _borderPaint);
+
+    // Part D: Rim depth effects REMOVED as per user design request for cleanest holes
+
+    // Capture the completed raster command buffer and save it to reusable hardware memory
+    _cachedPlatePicture = recorder.endRecording();
   }
 
   @override
@@ -159,22 +209,33 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
       return;
     }
 
-    // SMART STABILIZATION: Dampen and Force Sleep on resting contacts to eliminate all jitter
-    if (body.isAwake) {
-      final linVel = body.linearVelocity.length;
-      final angVel = body.angularVelocity.abs();
+    // SMART STABILIZATION V2: Only run braking when ACTIVELY TOUCHING a bolt/surface
+    // If free-falling or free-swinging (_activeContacts == 0), do NOT brake -> Full agility!
+    if (body.isAwake && _activeContacts > 0) {
+      final double linVel = body.linearVelocity.length;
+      final double angVel = body.angularVelocity.abs();
 
-      // 1. Damping Zone: Engage even sooner (< 1.5) and drain energy faster (0.85 multiplier)
-      if (linVel < 1.5 && angVel < 1.5) {
-        body.linearVelocity.scale(0.85);
-        body.angularVelocity *= 0.85;
+      // Stop tiny micro-movements instantly without waiting for BOTH axis conditions
+      bool shouldFreezeLin = false;
+      bool shouldFreezeAng = false;
 
-        // 2. Snap Zone: Raised slightly to 0.2 so it sleeps and locks faster to eliminate jitter
-        if (linVel < 0.2 && angVel < 0.2) {
-          body.linearVelocity = Vector2.zero();
-          body.angularVelocity = 0;
-          body.setAwake(false); // Kill all physical math processing
-        }
+      // 1. Ultra-Low Speed Linear braking (Only catches microscopic crawl)
+      if (linVel < 0.3) {
+        body.linearVelocity.scale(0.5); 
+        if (linVel < 0.1) shouldFreezeLin = true;
+      }
+
+      // 2. Ultra-Low Speed Angular braking
+      if (angVel < 0.3) {
+        body.angularVelocity *= 0.5; 
+        if (angVel < 0.1) shouldFreezeAng = true;
+      }
+
+      // 3. Ultimate Sleep Override: If BOTH directions are basically inert, KILL state
+      if (shouldFreezeLin && shouldFreezeAng) {
+        body.linearVelocity = Vector2.zero();
+        body.angularVelocity = 0;
+        body.setAwake(false); // Unconditional hibernation -> 100% Jitter Prevention
       }
     }
   }
@@ -185,8 +246,8 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
       userData: this,
       position: initialPosition,
       type: BodyType.dynamic,
-      linearDamping: 0.5,
-      angularDamping: 0.5,
+      linearDamping: 0.0,  // ZERO drag for max agility
+      angularDamping: 0.0, // Raw frictionless physics
       gravityScale: Vector2.all(1.0),
       allowSleep: true,
       bullet: true, // Continuous collision detection active from the start
@@ -200,9 +261,9 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
       case PlateShape.triangle:
         shape = PolygonShape()
           ..set([
-            Vector2(0, -size.y / 2),
-            Vector2(-size.x / 2, size.y / 2),
-            Vector2(size.x / 2, size.y / 2),
+            Vector2(0, -size.y * (2/3)),
+            Vector2(-size.x / 2, size.y / 3),
+            Vector2(size.x / 2, size.y / 3),
           ]);
         break;
       case PlateShape.box:
@@ -213,11 +274,12 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
     }
 
     final fixtureDef = FixtureDef(shape)
-      ..density = 0.15 // Lightened (from 0.3): less 'heavy' mass strain on joint solver -> smoother interaction
-      ..friction = 0.8 // Raised friction ensures plates 'stick' securely and stabilize faster
-      ..restitution = 0.0
+      ..density = 0.5   // Increased weight so it naturally forces itself down and away from bolts
+      ..friction = 0.15 // Reduced to SLIPPERY levels so it slides across bolts instead of gluing to them
+      ..restitution = 0.2 // Adds slight elastic bounce off solid surfaces
       ..filter.categoryBits = ScrewPuzzleGame.kPlateCategory
-      ..filter.maskBits = ScrewPuzzleGame.kBoltHoleCategory; // Enable collision by default to avoid initialization race conditions
+      ..filter.maskBits = ScrewPuzzleGame
+          .kBoltHoleCategory; // Enable collision by default to avoid initialization race conditions
 
     return world.createBody(bodyDef)..createFixture(fixtureDef);
   }
@@ -225,6 +287,7 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
   @override
   void beginContact(Object other, Contact contact) {
     super.beginContact(other, contact);
+    _activeContacts++; // Plate is now actively pushing against something
 
     // Only trigger sparks if the relative velocity is high enough
     if (other is PlateComponent || other is BoltComponent) {
@@ -240,18 +303,29 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
         final relativeVelocity =
             (body.linearVelocity - other.body.linearVelocity).length;
 
-        if (relativeVelocity > 12.0) {
-          final impactVolume = (relativeVelocity / 30.0).clamp(0.2, 1.0);
+        // Dropped threshold significantly (12.0 -> 3.0) so small knocks now satisfy the auditory industrial feedback
+        if (relativeVelocity > 3.0) {
+          // Dynamic volume scaling for varied auditory landscape
+          final impactVolume = (relativeVelocity / 20.0).clamp(0.15, 1.0);
           gameRef.audio.playPlateCollision(volume: impactVolume);
-          showSparks(point);
 
-          // --- ADDED: Camera Shake on impact ---
+          if (relativeVelocity > 8.0) {
+            showSparks(point);
+          }
+
+          // Trigger subtle camera shake on heavy mechanical impacts
           if (relativeVelocity > 18.0) {
             gameRef.shakeCamera(intensity: 0.4);
           }
         }
       }
     }
+  }
+
+  @override
+  void endContact(Object other, Contact contact) {
+    super.endContact(other, contact);
+    _activeContacts = (_activeContacts - 1).clamp(0, 999);
   }
 
   @override
@@ -310,8 +384,11 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
                     ? (1 - particle.progress) * 2
                     : 1.0;
                 // Reuse the cached paint instance rather than instantiating new Memory every tick
-                canvas.drawLine(Offset.zero, Offset(dirVector.x, dirVector.y), 
-                  renderPaint..color = Colors.orangeAccent.withOpacity(fade));
+                canvas.drawLine(
+                  Offset.zero,
+                  Offset(dirVector.x, dirVector.y),
+                  renderPaint..color = Colors.orangeAccent.withOpacity(fade),
+                );
               },
             ),
           );
@@ -329,65 +406,42 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
       height: size.y,
     );
 
-    // 1. Optimized Shadow: Avoid Path.shift which generates memory garbage every frame
-    final shadowOffsetVec = Vector2(0.15, 0.3)..rotate(-body.angle);
-    canvas.save();
-    canvas.translate(shadowOffsetVec.x, shadowOffsetVec.y);
-    canvas.drawPath(_platePath, _shadowPaint);
-    canvas.restore();
 
-    // 2. Surface (Shader Caching)
-    if (_lastRect != rect || _surfaceShader == null) {
-      _lastRect = rect;
-      _surfaceShader = LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: const [Color(0xFF424242), Color(0xFF616161), Color(0xFF212121)],
-        stops: const [0.0, 0.5, 1.0],
-      ).createShader(rect);
+    // 2. NEW GOD-TIER OPTIMIZATION: Direct Hardware Acceleration Draw
+    // Instead of looping over layers and holes every frame, blast the pre-recorded picture instantly
+    if (_cachedPlatePicture != null) {
+      canvas.drawPicture(_cachedPlatePicture!);
     }
-    _surfacePaint.shader = _surfaceShader;
-    canvas.drawPath(_platePath, _surfacePaint);
 
-    // 3. Wear & Scratches
-    canvas.drawLine(
-      Offset(-size.x / 2.2, size.y / 4),
-      Offset(size.x / 4, -size.y / 3),
-      _scratchPaint,
-    );
-
-    // 4. Border
-    canvas.drawPath(_platePath, _borderPaint);
-
-    // 5. Optimized Glint (Using translation to avoid shader re-creation)
+    // 3. Optimized Glint (Still dynamic because position translates based on timer)
     final glintProgress = (_glintTimer % 5.0) / 5.0;
     final glintX = -size.x + (glintProgress * size.x * 6);
-    
-    if (_glintShader == null) {
-      _glintShader = LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          Colors.white.withOpacity(0.0),
-          Colors.white.withOpacity(0.15),
-          Colors.white.withOpacity(0.0),
-        ],
-      ).createShader(Rect.fromLTWH(0, -size.y, size.x * 0.4, size.y * 2));
-    }
-    
+
+    _glintShader ??= LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [
+        Colors.white.withOpacity(0.0),
+        Colors.white.withOpacity(0.15),
+        Colors.white.withOpacity(0.0),
+      ],
+    ).createShader(Rect.fromLTWH(0, -size.y, size.x * 0.4, size.y * 2));
+
     _glintPaint.shader = _glintShader;
-    
+
     canvas.save();
     canvas.clipPath(_platePath);
     canvas.translate(glintX, 0);
-    canvas.drawPaint(_glintPaint);
+    // SAFETY BOUNDING: Using restricted DrawRect ensures absolute zero bleed outside the clip region,
+    // preventing accidental white-screen fill artifacts on certain hardware.
+    canvas.drawRect(Rect.fromLTWH(-size.x * 2, -size.y * 2, size.x * 4, size.y * 4), _glintPaint);
     canvas.restore();
-
-    // 6. Rims
-    for (final localPos in _localHoles) {
-      final offset = Offset(localPos.x, localPos.y);
-      canvas.drawCircle(offset, 0.40, _rimPaint);
-      canvas.drawCircle(offset, 0.38, _depthPaint);
-    }
+  }
+  
+  @override
+  void onRemove() {
+    // Clean up hardware picture buffer memory when object is discarded
+    _cachedPlatePicture?.dispose();
+    super.onRemove();
   }
 }

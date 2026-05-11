@@ -9,9 +9,19 @@ class BackgroundComponent extends PositionComponent with HasGameRef<ScrewPuzzleG
   @override
   Future<void> onLoad() async {
     await super.onLoad();
-    size = gameRef.canvasSize;
     priority = -10;
-    _preRender();
+    // Do not set size here as canvasSize might be zero during immediate startup
+  }
+
+  @override
+  void onGameResize(Vector2 newSize) {
+    super.onGameResize(newSize);
+    
+    // Only re-render if the actual window size changed (or first load)
+    if (size != newSize) {
+      size = newSize.clone();
+      _preRender();
+    }
   }
 
   void _preRender() {

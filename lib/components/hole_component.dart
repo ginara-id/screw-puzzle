@@ -65,32 +65,43 @@ class HoleComponent extends BodyComponent<ScrewPuzzleGame>
     return world.createBody(bodyDef)..createFixture(fixtureDef);
   }
 
+  // OPTIMIZATION: Static cached paints to prevent Garbage Collector thrashing
+  static final _holeBasePaint = Paint()..color = const Color(0xFF111111);
+  static final _depthBasePaint = Paint()
+    ..color = Colors.black.withOpacity(0.5)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 0.1;
+  static final _rimBasePaint = Paint()
+    ..color = Colors.white.withOpacity(0.1)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 0.05;
+  static final _lockBgPaint = Paint()..color = Colors.black.withOpacity(0.65);
+  static final _btnShadowPaint = Paint()..color = Colors.black.withOpacity(0.5);
+  
+  // Caching dynamically generated objects
+  Shader? _btnShader;
+  Shader? _glassShader;
+  TextPainter? _cachedIconPainter;
+
   @override
   void render(Canvas canvas) {
     canvas.save();
     canvas.scale(scale.x);
 
-    // 1. Inner Dark Hole (The deep background)
-    final holePaint = Paint()..color = const Color(0xFF111111);
-    canvas.drawCircle(Offset.zero, radius, holePaint);
+    // 1. Inner Dark Hole - Using cached static paint
+    canvas.drawCircle(Offset.zero, radius, _holeBasePaint);
 
-    // 2. Inner Shadow (Depth) - Standardized with PlateComponent
-    final depthPaint = Paint()
-      ..color = Colors.black.withOpacity(0.5)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.1;
-    canvas.drawCircle(Offset.zero, radius - 0.02, depthPaint);
+    // 2. Inner Shadow (Depth)
+    canvas.drawCircle(Offset.zero, radius - 0.02, _depthBasePaint);
 
-    // 3. Metallic Rim - Standardized with PlateComponent
-    final rimPaint = Paint()
-      ..color = Colors.white.withOpacity(0.1)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.05;
-    canvas.drawCircle(Offset.zero, radius, rimPaint);
+    // 3. Metallic Rim
+    canvas.drawCircle(Offset.zero, radius, _rimBasePaint);
 
     // 4. Target Highlight Glow (Only when active and not occupied)
     if (isTargetHighlight && !isOccupied && !isAdLocked) {
       final pulseAlpha = ((math.sin(_pulseTime) + 1.0) / 2.0 * 150).toInt();
+      
+      // Still efficient as temporary assignment, consider static cache if needed later
       final glowPaint = Paint()
         ..color = Color.fromARGB(pulseAlpha, 255, 255, 255)
         ..style = PaintingStyle.fill
@@ -98,58 +109,57 @@ class HoleComponent extends BodyComponent<ScrewPuzzleGame>
       canvas.drawCircle(Offset.zero, radius * 0.8, glowPaint);
 
       final strokeGlowPaint = Paint()
-        ..color =
-            Color.fromARGB(pulseAlpha + 50, 255, 215, 0) // Amber tint
+        ..color = Color.fromARGB(pulseAlpha + 50, 255, 215, 0) 
         ..style = PaintingStyle.stroke
         ..strokeWidth = 0.05;
       canvas.drawCircle(Offset.zero, radius * 0.9, strokeGlowPaint);
     }
 
-    // 5. Ad Lock Overlay (3D Style)
+    // 5. Ad Lock Overlay (HEAVY OPTIMIZATION APPLIED)
     if (isAdLocked) {
-      // Background Dim
-      final lockPaint = Paint()..color = Colors.black.withOpacity(0.65);
-      canvas.drawCircle(Offset.zero, radius, lockPaint);
+      canvas.drawCircle(Offset.zero, radius, _lockBgPaint);
+      canvas.drawCircle(const Offset(0.05, 0.08), radius * 0.7, _btnShadowPaint);
 
-      // 3D Button Base (Shadow)
-      final btnShadow = Paint()..color = Colors.black.withOpacity(0.5);
-      canvas.drawCircle(const Offset(0.05, 0.08), radius * 0.7, btnShadow);
+      // Build Shaders only ONCE ever per component instance
+      _btnShader ??= const RadialGradient(
+        colors: [Color(0xFFFFD54F), Color(0xFFF57F17)],
+      ).createShader(Rect.fromCircle(center: Offset.zero, radius: radius * 0.7));
+      
+      _glassShader ??= LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Colors.white.withOpacity(0.5), Colors.white.withOpacity(0.0)],
+      ).createShader(Rect.fromCircle(center: Offset.zero, radius: radius * 0.7));
 
-      // 3D Button Base (Main)
-      final btnPaint = Paint()
-        ..shader = const RadialGradient(
-          colors: [Color(0xFFFFD54F), Color(0xFFF57F17)],
-        ).createShader(Rect.fromCircle(center: Offset.zero, radius: radius * 0.7));
-      canvas.drawCircle(Offset.zero, radius * 0.7, btnPaint);
+      canvas.drawCircle(Offset.zero, radius * 0.7, Paint()..shader = _btnShader);
+      canvas.drawCircle(Offset.zero, radius * 0.7, Paint()..shader = _glassShader);
 
-      // Glassy Highlight
-      final glassPaint = Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Colors.white.withOpacity(0.5), Colors.white.withOpacity(0.0)],
-        ).createShader(Rect.fromCircle(center: Offset.zero, radius: radius * 0.7));
-      canvas.drawCircle(Offset.zero, radius * 0.7, glassPaint);
-
-      // Play Icon (Inside)
-      final iconPainter = TextPainter(
-        text: TextSpan(
-          text: String.fromCharCode(Icons.play_arrow_rounded.codePoint),
-          style: TextStyle(
-            fontSize: radius * 1.2,
-            fontFamily: Icons.play_arrow_rounded.fontFamily,
-            package: Icons.play_arrow_rounded.fontPackage,
-            color: Colors.white,
-            shadows: const [
-              Shadow(color: Colors.black26, offset: Offset(1, 1), blurRadius: 1),
-            ],
+      // ABSOLUTE CULPRIT FOUND AND TERMINATED HERE:
+      // Never recreate or call layout() on a TextPainter in render loop!
+      if (_cachedIconPainter == null) {
+        _cachedIconPainter = TextPainter(
+          text: TextSpan(
+            text: String.fromCharCode(Icons.play_arrow_rounded.codePoint),
+            style: TextStyle(
+              fontSize: radius * 1.2,
+              fontFamily: Icons.play_arrow_rounded.fontFamily,
+              package: Icons.play_arrow_rounded.fontPackage,
+              color: Colors.white,
+              shadows: const [
+                Shadow(color: Colors.black26, offset: Offset(1, 1), blurRadius: 1),
+              ],
+            ),
           ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      iconPainter.paint(
+          textDirection: TextDirection.ltr,
+        );
+        // Perform expensive text metrics layout EXACTLY ONCE in object lifetime
+        _cachedIconPainter!.layout();
+      }
+
+      // Super fast hardware blit drawing
+      _cachedIconPainter!.paint(
         canvas,
-        Offset(-iconPainter.width / 2, -iconPainter.height / 2),
+        Offset(-_cachedIconPainter!.width / 2, -_cachedIconPainter!.height / 2),
       );
     }
 

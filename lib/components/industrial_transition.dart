@@ -1,6 +1,7 @@
+import 'dart:ui';
 import 'package:flame/components.dart';
 import 'package:flame/effects.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Image, Picture;
 import 'dart:math';
 import '../game/screw_game.dart';
 
@@ -113,57 +114,62 @@ class IndustrialTransitionComponent extends PositionComponent with HasGameRef<Sc
 
 class _Door extends PositionComponent {
   final bool isLeft;
-  
-  _Door({required super.size, required super.position, required this.isLeft}) 
-    : super(anchor: Anchor.center);
+  Picture? _cachedPicture;
+
+  _Door({required super.size, required super.position, required this.isLeft})
+      : super(anchor: Anchor.center);
 
   @override
-  void render(Canvas canvas) {
+  Future<void> onLoad() async {
+    await super.onLoad();
+    _preRender();
+  }
+
+  void _preRender() {
+    final recorder = PictureRecorder();
+    final canvas = Canvas(recorder);
     final rect = size.toRect();
-    
-    // Heavy iron metal paint
-    final paint = Paint()
-      ..color = const Color(0xFF2A2A2A);
+
+    // 1. Heavy iron metal paint
+    final paint = Paint()..color = const Color(0xFF2A2A2A);
     canvas.drawRect(rect, paint);
-    
-    // Inner shadows and highlights for massive metal plate feel (Scale up for screen coords)
+
+    // 2. Inner shadows and highlights for massive metal plate feel
     final highlight = Paint()..color = Colors.white.withOpacity(0.1);
     final shadow = Paint()..color = Colors.black.withOpacity(0.6);
     final thick = 4.0;
-    
-    // Top highlight
+
     canvas.drawRect(Rect.fromLTWH(0, 0, size.x, thick), highlight);
-    // Bottom shadow
     canvas.drawRect(Rect.fromLTWH(0, size.y - thick, size.x, thick), shadow);
-    
+
     if (isLeft) {
       canvas.drawRect(Rect.fromLTWH(0, 0, thick, size.y), highlight);
-      canvas.drawRect(Rect.fromLTWH(size.x - thick*2, 0, thick*2, size.y), shadow);
+      canvas.drawRect(Rect.fromLTWH(size.x - thick * 2, 0, thick * 2, size.y), shadow);
     } else {
-      canvas.drawRect(Rect.fromLTWH(0, 0, thick*2, size.y), highlight);
+      canvas.drawRect(Rect.fromLTWH(0, 0, thick * 2, size.y), highlight);
       canvas.drawRect(Rect.fromLTWH(size.x - thick, 0, thick, size.y), shadow);
     }
-    
-    // Rust / Grime Overlay
+
+    // 3. Rust / Grime Overlay
     final grimePaint = Paint()
       ..shader = RadialGradient(
         colors: [Colors.transparent, Colors.black.withOpacity(0.4)],
       ).createShader(rect);
     canvas.drawRect(rect, grimePaint);
-    
-    // Warning Stripes on the closing edge
+
+    // 4. Warning Stripes
     final stripeWidth = 40.0;
-    final stripeRect = isLeft 
-      ? Rect.fromLTWH(size.x - stripeWidth - thick*2, 0, stripeWidth, size.y)
-      : Rect.fromLTWH(thick*2, 0, stripeWidth, size.y);
-      
+    final stripeRect = isLeft
+        ? Rect.fromLTWH(size.x - stripeWidth - thick * 2, 0, stripeWidth, size.y)
+        : Rect.fromLTWH(thick * 2, 0, stripeWidth, size.y);
+
     final stripeBasePaint = Paint()..color = const Color(0xFFFF9800);
     canvas.drawRect(stripeRect, stripeBasePaint);
-    
+
     final hazardPaint = Paint()
       ..color = const Color(0xFF111111)
       ..style = PaintingStyle.fill;
-    
+
     canvas.save();
     canvas.clipRect(stripeRect);
     for (var i = -size.y; i < size.y * 2; i += 40.0) {
@@ -176,23 +182,41 @@ class _Door extends PositionComponent {
       canvas.drawPath(path, hazardPaint);
     }
     canvas.restore();
-    
-    // Heavy Rivets
+
+    // 5. Heavy Rivets
     final rivetPaint = Paint()..color = const Color(0xFF555555);
     final rivetShadow = Paint()..color = Colors.black.withOpacity(0.8);
     final rivetHighlight = Paint()..color = Colors.white.withOpacity(0.3);
-    
+
     final rivetX = isLeft ? size.x - stripeWidth - 30.0 : stripeWidth + 30.0;
-    
+
     for (var y = 40.0; y < size.y; y += 80.0) {
       canvas.drawCircle(Offset(rivetX + 2, y + 2), 6.0, rivetShadow);
       canvas.drawCircle(Offset(rivetX, y), 6.0, rivetPaint);
       canvas.drawCircle(Offset(rivetX - 2, y - 2), 3.0, rivetHighlight);
     }
-    
-    // Horizontal center seam
-    final seamPaint = Paint()..color = Colors.black.withOpacity(0.3)..strokeWidth = 3.0;
+
+    // 6. Horizontal center seam
+    final seamPaint = Paint()
+      ..color = Colors.black.withOpacity(0.3)
+      ..strokeWidth = 3.0;
     canvas.drawLine(Offset(0, size.y / 2), Offset(size.x, size.y / 2), seamPaint);
-    canvas.drawLine(Offset(0, size.y / 2 + 3.0), Offset(size.x, size.y / 2 + 3.0), highlight..strokeWidth=1.0);
+    canvas.drawLine(
+        Offset(0, size.y / 2 + 3.0), Offset(size.x, size.y / 2 + 3.0), highlight..strokeWidth = 1.0);
+
+    _cachedPicture = recorder.endRecording();
+  }
+
+  @override
+  void render(Canvas canvas) {
+    if (_cachedPicture != null) {
+      canvas.drawPicture(_cachedPicture!);
+    }
+  }
+
+  @override
+  void onRemove() {
+    _cachedPicture?.dispose();
+    super.onRemove();
   }
 }
