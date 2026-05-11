@@ -164,16 +164,16 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
       final linVel = body.linearVelocity.length;
       final angVel = body.angularVelocity.abs();
 
-      // 1. Damping Zone: Start aggressively bleeding energy when moving slowly
-      if (linVel < 0.8 && angVel < 0.8) {
-        body.linearVelocity.scale(0.90);
-        body.angularVelocity *= 0.90;
+      // 1. Damping Zone: Engage even sooner (< 1.5) and drain energy faster (0.85 multiplier)
+      if (linVel < 1.5 && angVel < 1.5) {
+        body.linearVelocity.scale(0.85);
+        body.angularVelocity *= 0.85;
 
-        // 2. Snap Zone: If near standstill, hard-reset and FORCE SLEEP
-        if (linVel < 0.1 && angVel < 0.1) {
+        // 2. Snap Zone: Raised slightly to 0.2 so it sleeps and locks faster to eliminate jitter
+        if (linVel < 0.2 && angVel < 0.2) {
           body.linearVelocity = Vector2.zero();
           body.angularVelocity = 0;
-          body.setAwake(false); // Eliminates processing entirely -> ZERO jitter
+          body.setAwake(false); // Kill all physical math processing
         }
       }
     }
@@ -213,7 +213,7 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
     }
 
     final fixtureDef = FixtureDef(shape)
-      ..density = 0.3
+      ..density = 0.15 // Lightened (from 0.3): less 'heavy' mass strain on joint solver -> smoother interaction
       ..friction = 0.8 // Raised friction ensures plates 'stick' securely and stabilize faster
       ..restitution = 0.0
       ..filter.categoryBits = ScrewPuzzleGame.kPlateCategory
@@ -293,6 +293,13 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
         generator: (i) {
           final angle = rnd.nextDouble() * pi * 2;
           final speed = 12 + rnd.nextDouble() * 20;
+          // Cache static visual variables outside per-frame renderer loop
+          final dirVector = Vector2(cos(angle), sin(angle)) * 0.6;
+          final renderPaint = Paint()
+            ..strokeWidth = 0.15
+            ..style = PaintingStyle.stroke
+            ..strokeCap = StrokeCap.round;
+
           return AcceleratedParticle(
             acceleration: Vector2(0, 60),
             speed: Vector2(cos(angle) * speed, sin(angle) * speed),
@@ -302,13 +309,9 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
                 final fade = particle.progress > 0.5
                     ? (1 - particle.progress) * 2
                     : 1.0;
-                final paint = Paint()
-                  ..color = Colors.orangeAccent.withOpacity(fade)
-                  ..strokeWidth = 0.15
-                  ..style = PaintingStyle.stroke
-                  ..strokeCap = StrokeCap.round;
-                final dir = Vector2(cos(angle), sin(angle)) * 0.6;
-                canvas.drawLine(Offset.zero, Offset(dir.x, dir.y), paint);
+                // Reuse the cached paint instance rather than instantiating new Memory every tick
+                canvas.drawLine(Offset.zero, Offset(dirVector.x, dirVector.y), 
+                  renderPaint..color = Colors.orangeAccent.withOpacity(fade));
               },
             ),
           );
@@ -326,9 +329,12 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
       height: size.y,
     );
 
-    // 1. Optimized Shadow
+    // 1. Optimized Shadow: Avoid Path.shift which generates memory garbage every frame
     final shadowOffsetVec = Vector2(0.15, 0.3)..rotate(-body.angle);
-    canvas.drawPath(_platePath.shift(Offset(shadowOffsetVec.x, shadowOffsetVec.y)), _shadowPaint);
+    canvas.save();
+    canvas.translate(shadowOffsetVec.x, shadowOffsetVec.y);
+    canvas.drawPath(_platePath, _shadowPaint);
+    canvas.restore();
 
     // 2. Surface (Shader Caching)
     if (_lastRect != rect || _surfaceShader == null) {

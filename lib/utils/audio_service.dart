@@ -30,13 +30,15 @@ class AudioService {
       _pools['bolt_snap.wav'] = await FlameAudio.createPool('bolt_snap.wav', minPlayers: 1, maxPlayers: 2);
       _pools['plate_collision.wav'] = await FlameAudio.createPool('plate_collision.wav', minPlayers: 1, maxPlayers: 4);
       _pools['booster_click.wav'] = await FlameAudio.createPool('booster_click.wav', minPlayers: 1, maxPlayers: 1);
+      
+      // Cache large win/lose states too into pools to completely kill native MediaPlayer spawning
+      _pools['victory.wav'] = await FlameAudio.createPool('victory.wav', minPlayers: 1, maxPlayers: 1);
+      _pools['game_over.wav'] = await FlameAudio.createPool('game_over.wav', minPlayers: 1, maxPlayers: 1);
 
-      // 3. Cache rare sounds
+      // 3. Cache only continuous BGM
       await FlameAudio.audioCache.loadAll([
         'bgm_menu.wav',
         'bgm_game.wav',
-        'victory.wav',
-        'game_over.wav',
       ]);
     } catch (e) {
       print('AudioService Critical Init Error: $e');

@@ -52,7 +52,7 @@ class ScrewPuzzleGame extends Forge2DGame {
 
   ScrewPuzzleGame()
     : super(
-        gravity: Vector2(0, 30.0), // Supercharged gravity for snappy, realistic fall impacts
+        gravity: Vector2(0, 22.0), // Balanced gravity to provide speed without crushing physics solver
       ) {
     velocityIterations = 25; // Tighter constraint tolerance
     positionIterations = 25;
@@ -620,29 +620,31 @@ class ScrewPuzzleGame extends Forge2DGame {
         particle: Particle.generate(
           count: count,
           lifespan: 0.4,
-          generator: (i) => AcceleratedParticle(
-            acceleration: Vector2(0, 20),
-            speed: Vector2(
-              (math.Random().nextDouble() - 0.5) *
-                  (isMetalDust || isRustDust ? 300 : 600),
-              (math.Random().nextDouble() - 0.5) *
-                  (isMetalDust || isRustDust ? 300 : 600),
-            ),
-            position: position.clone(),
-            child: ComputedParticle(
-              renderer: (canvas, particle) {
-                final paint = Paint()
-                  ..color = Color.lerp(color1, color2, particle.progress)!
-                  ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
-
-                canvas.drawCircle(
-                  Offset.zero,
-                  (1 - particle.progress) * 2.0,
-                  paint,
-                );
-              },
-            ),
-          ),
+          generator: (i) {
+            // Pre-define and share the paint object to fully stop heap-spamming per frame
+            final cachePaint = Paint()..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
+            
+            return AcceleratedParticle(
+              acceleration: Vector2(0, 20),
+              speed: Vector2(
+                (math.Random().nextDouble() - 0.5) *
+                    (isMetalDust || isRustDust ? 300 : 600),
+                (math.Random().nextDouble() - 0.5) *
+                    (isMetalDust || isRustDust ? 300 : 600),
+              ),
+              position: position.clone(),
+              child: ComputedParticle(
+                renderer: (canvas, particle) {
+                  // Only change the mutable color value, reusing the parent object container
+                  canvas.drawCircle(
+                    Offset.zero,
+                    (1 - particle.progress) * 2.0,
+                    cachePaint..color = Color.lerp(color1, color2, particle.progress)!,
+                  );
+                },
+              ),
+            );
+          },
         ),
       ),
     );
@@ -651,18 +653,17 @@ class ScrewPuzzleGame extends Forge2DGame {
   void showComboEffect(Vector2 position, int count) {
     if (count < 1) return;
 
-    // CASINO STYLE: Escalating haptics and sounds
+    // SOUND FIX: Never play heavy non-pooled 'victory' sound during regular gameplay loops
+    // Reusing fast, pooled click/booster sounds instead to prevent Android main-thread memory locking
+    audio.playBoosterClick();
+    
     if (count == 1) {
-      audio.playBoosterClick();
       HapticFeedback.lightImpact();
     } else if (count == 2) {
-      audio.playVictory();
       HapticFeedback.mediumImpact();
     } else if (count == 3) {
-      audio.playVictory();
       HapticFeedback.heavyImpact();
     } else {
-      audio.playVictory();
       HapticFeedback.vibrate(); // Maximum intensity
     }
 

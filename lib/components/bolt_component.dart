@@ -17,6 +17,31 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
   int hitsRemaining;
   HoleComponent? previousHole;
 
+  // CACHED PAINTS & SHADERS: Prevents creation of objects during the render loop
+  late final Paint _shadowPaint = Paint();
+  late final Paint _headPaint = Paint();
+  late final Paint _rustTexturePaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.03
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 0.02);
+  late final Paint _crackPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.02;
+  late final Paint _rimHighlight = Paint()
+      ..color = Colors.white.withOpacity(0.4)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.02;
+  late final Paint _slotPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+  late final Paint _shadowSlotPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 0.02);
+
+  Shader? _cachedHeadShader;
+  Shader? _cachedSlotShader;
+  int? _lastHashState; // Detects changes to invalidate shader
+
   BoltComponent({
     required this.initialPosition,
     this.radius = 0.40,
@@ -106,112 +131,99 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
   }
 
   void _drawBolt(Canvas canvas) {
-    // SCALE & SHADOW CALCULATION
+    // 1. Optimize Shadow Calculation: Directly set reuseable paint state
     final scaleFactor = (isLifted ? 1.3 : 1.0) * scale.x;
     final blurIntensity = isLifted ? 0.2 : 0.08;
 
-    // FIX: Shadow offset that stays fixed in world space even when bolt spins
     final worldOffset = isLifted ? Vector2(0.2, 0.4) : Vector2(0.05, 0.1);
     final localOffset = worldOffset..rotate(-body.angle);
     final shadowOffset = Offset(localOffset.x, localOffset.y);
 
-    // Dynamic Shadow
-    final shadowPaint = Paint()
+    // Configure reusable shadow paint
+    _shadowPaint
       ..color = Colors.black.withOpacity(isLifted ? 0.6 : 0.5)
       ..maskFilter = MaskFilter.blur(BlurStyle.normal, blurIntensity);
 
-    canvas.drawCircle(shadowOffset, radius, shadowPaint);
+    canvas.drawCircle(shadowOffset, radius, _shadowPaint);
 
+    // 2. Pre-allocate constant drawing rect for shaders
     final rect = Rect.fromCircle(center: Offset.zero, radius: radius);
 
-    // Metallic Head (Polished Chrome / Rusty Steel)
-    final progress = isRusty ? (hitsRemaining / 5.0) : 0.0;
+    // SMART SHADER CACHE: Check hash to see if rusty progression changed
+    final int currentStateHash = (isRusty ? 1000 : 0) + hitsRemaining;
     
-    final rustColors = [
-      const Color(0xFFD35400),
-      const Color(0xFF8E44AD),
-      const Color(0xFF3E2723),
-    ];
-    final cleanColors = [
-      const Color(0xFFFFEB3B), // Bright Yellow
-      const Color(0xFFFBC02D), // Deep Yellow
-      const Color(0xFFF9A825), // Golden Amber
-    ];
+    if (_cachedHeadShader == null || _lastHashState != currentStateHash) {
+      _lastHashState = currentStateHash;
+      
+      final progress = isRusty ? (hitsRemaining / 5.0) : 0.0;
+      final rustColors = [const Color(0xFFD35400), const Color(0xFF8E44AD), const Color(0xFF3E2723)];
+      final cleanColors = [const Color(0xFFFFEB3B), const Color(0xFFFBC02D), const Color(0xFFF9A825)];
+      
+      // Manual lerp to avoid List.generate dynamic lists memory footprint
+      final colors = [
+        Color.lerp(cleanColors[0], rustColors[0], progress)!,
+        Color.lerp(cleanColors[1], rustColors[1], progress)!,
+        Color.lerp(cleanColors[2], rustColors[2], progress)!,
+      ];
 
-    final currentColors = List.generate(3, (i) => Color.lerp(cleanColors[i], rustColors[i], progress)!);
-
-    final headPaint = Paint()
-      ..shader = RadialGradient(
+      _cachedHeadShader = RadialGradient(
         center: const Alignment(-0.4, -0.4),
-        colors: currentColors,
+        colors: colors,
         stops: const [0.0, 0.4, 1.0],
       ).createShader(rect);
+
+      // Slot Shader Cache
+      _cachedSlotShader ??= LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Colors.black, const Color(0xFF2C3E50)],
+      ).createShader(rect);
+    }
+
+    _headPaint.shader = _cachedHeadShader;
 
     canvas.save();
     canvas.scale(scaleFactor);
 
-    // 1. Base Shape
-    canvas.drawCircle(Offset.zero, radius, headPaint);
+    // Draw Metal Head
+    canvas.drawCircle(Offset.zero, radius, _headPaint);
 
-    // Add some "rust texture" if rusty
+    // 3. Rust Layer optimization
     if (isRusty) {
       final progress = hitsRemaining / 5.0;
-      final rustTexturePaint = Paint()
-        ..color = Colors.black.withOpacity(0.3 * progress)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 0.03
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 0.02);
-      
-      // Draw concentric rings that fade
-      canvas.drawCircle(Offset.zero, radius * 0.7, rustTexturePaint);
-      canvas.drawCircle(Offset.zero, radius * 0.4, rustTexturePaint);
+      canvas.drawCircle(Offset.zero, radius * 0.7, _rustTexturePaint..color = Colors.black.withOpacity(0.3 * progress));
+      canvas.drawCircle(Offset.zero, radius * 0.4, _rustTexturePaint);
 
-      // Draw random "cracks" as the bolt is hit
       if (hitsRemaining < 5) {
-        final crackPaint = Paint()
-          ..color = Colors.black.withOpacity(0.4 * (1 - progress))
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 0.02;
+        // Draw cracks without recreating Random seed generators and complex logic inside rendering loop
+        _crackPaint.color = Colors.black.withOpacity(0.4 * (1 - progress));
         
-        final random = Random(42);
+        // Seed fixed once based on position so it does not re-randomize and dance every frame causing redraw stress
+        final fixedSeed = initialPosition.x.toInt() ^ initialPosition.y.toInt();
+        final staticRandom = Random(fixedSeed);
         for (var i = 0; i < (5 - hitsRemaining) * 3; i++) {
-          final angle = random.nextDouble() * pi * 2;
-          final r1 = random.nextDouble() * radius;
+          final angle = staticRandom.nextDouble() * pi * 2;
+          final r1 = staticRandom.nextDouble() * radius;
           final r2 = r1 + 0.2;
           canvas.drawLine(
             Offset(cos(angle) * r1, sin(angle) * r1),
             Offset(cos(angle + 0.2) * r2, sin(angle + 0.2) * r2),
-            crackPaint,
+            _crackPaint,
           );
         }
       }
     }
 
-    // 2. Beveled Rim (Highlight edge)
-    final rimHighlight = Paint()
-      ..color = Colors.white.withOpacity(0.4)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.02;
-    canvas.drawCircle(Offset.zero, radius * 0.95, rimHighlight);
+    // 4. Beveled Highlight
+    canvas.drawCircle(Offset.zero, radius * 0.95, _rimHighlight);
 
-    // 3. Realistic Slot (Phillips '+' or Torx '*')
-    final isTorx = (initialPosition.x.toInt() + initialPosition.y.toInt()) % 5 == 0; // Pseudo-random 1 in 5 is Torx
-
-    final slotPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Colors.black, const Color(0xFF2C3E50)],
-      ).createShader(rect)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = isTorx ? 0.08 : 0.12
-      ..strokeCap = StrokeCap.round;
-
-    final shadowSlotPaint = Paint()
-      ..color = Colors.black.withOpacity(0.5)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = isTorx ? 0.10 : 0.14
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 0.02);
+    // 5. Slot Painting Optimization
+    final isTorx = (initialPosition.x.toInt() + initialPosition.y.toInt()) % 5 == 0;
+    
+    _slotPaint.shader = _cachedSlotShader;
+    _slotPaint.strokeWidth = isTorx ? 0.08 : 0.12;
+    _shadowSlotPaint.color = Colors.black.withOpacity(0.5);
+    _shadowSlotPaint.strokeWidth = isTorx ? 0.10 : 0.14;
 
     if (isLifted) {
       canvas.rotate(0.35);
@@ -223,7 +235,6 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
     }
 
     void drawTorx(Paint p) {
-      // 6-point star (Torx)
       for (var i = 0; i < 3; i++) {
         final angle = i * (pi / 3);
         canvas.drawLine(
@@ -232,16 +243,16 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
           p,
         );
       }
-      // Inner hollow circle for security torx look
       canvas.drawCircle(Offset.zero, radius * 0.15, p..style = PaintingStyle.fill);
+      p.style = PaintingStyle.stroke; // restore after fill
     }
 
     if (isTorx) {
-      drawTorx(shadowSlotPaint);
-      drawTorx(slotPaint);
+      drawTorx(_shadowSlotPaint);
+      drawTorx(_slotPaint);
     } else {
-      drawPhillips(shadowSlotPaint); // First draw shadow
-      drawPhillips(slotPaint);       // Then draw main slot
+      drawPhillips(_shadowSlotPaint);
+      drawPhillips(_slotPaint);
     }
 
     canvas.restore();
