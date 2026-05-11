@@ -1,4 +1,4 @@
-package com.example.screw_puzzle
+package com.eamonstudio.boltforge
 
 import io.flutter.embedding.android.FlutterActivity
 

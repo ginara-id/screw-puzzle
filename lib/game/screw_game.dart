@@ -132,10 +132,16 @@ class ScrewPuzzleGame extends Forge2DGame {
   bool _isVictoryTriggered = false;
 
   // TIMER SYSTEM
-  double _remainingTime = 60.0; // Default 60s
+  double _levelTimeLimit = 120.0; // Tracking current level total
+  double _remainingTime = 120.0; 
   bool _isGameOver = false;
   bool get isGameOver => _isGameOver;
   double get remainingTime => _remainingTime;
+
+  void setLevelTimeLimit(double seconds) {
+    _levelTimeLimit = seconds;
+    _remainingTime = seconds;
+  }
 
   double _victoryCheckTimer = 0;
 
@@ -300,7 +306,7 @@ class ScrewPuzzleGame extends Forge2DGame {
   void resetLevel({TransitionMode mode = TransitionMode.closeAndOpen}) {
     _isVictoryTriggered = false;
     _isGameOver = false;
-    _remainingTime = 60.0;
+    _remainingTime = _levelTimeLimit; // Uses custom time limit from JSON
     levelManager.loadLevel(currentLevel, transitionMode: mode);
   }
 
@@ -663,30 +669,28 @@ class ScrewPuzzleGame extends Forge2DGame {
         ? 4
         : 8; // Reduced for performance
 
-    add(
+    world.add(
       ParticleSystemComponent(
         particle: Particle.generate(
           count: count,
           lifespan: 0.4,
           generator: (i) {
-            // Using sharp vector dots instead of expensive Blur Shaders saves enormous GPU load
             final cachePaint = Paint();
             
             return AcceleratedParticle(
-              acceleration: Vector2(0, 20),
+              acceleration: Vector2(0, 40), // Tuned for world physics
               speed: Vector2(
                 (math.Random().nextDouble() - 0.5) *
-                    (isMetalDust || isRustDust ? 300 : 600),
+                    (isMetalDust || isRustDust ? 15 : 30), // Scaled down for world meters
                 (math.Random().nextDouble() - 0.5) *
-                    (isMetalDust || isRustDust ? 300 : 600),
+                    (isMetalDust || isRustDust ? 15 : 30),
               ),
               position: position.clone(),
               child: ComputedParticle(
                 renderer: (canvas, particle) {
-                  // Only change the mutable color value, reusing the parent object container
                   canvas.drawCircle(
                     Offset.zero,
-                    (1 - particle.progress) * 2.0,
+                    (1 - particle.progress) * 0.12, // Properly scaled small world spark
                     cachePaint..color = Color.lerp(color1, color2, particle.progress)!,
                   );
                 },

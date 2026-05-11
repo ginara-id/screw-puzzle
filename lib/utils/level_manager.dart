@@ -39,6 +39,10 @@ class LevelManager {
         game.world.removeAll(game.world.children);
         game.clearLevelState();
 
+        // 1.5 Load Level-Specific Time Limit (Fallback to 120s if not present in JSON)
+        final num timeFromData = data['timeLimit'] ?? 120.0;
+        game.setLevelTimeLimit(timeFromData.toDouble());
+
         // 2. Spawn Holes
         final holesData = data['holes'] as List;
         final allHoles = <HoleComponent>[];

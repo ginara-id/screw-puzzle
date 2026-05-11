@@ -92,29 +92,9 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
     _isLifted = value;
     priority = value ? 100 : 3;
 
-    // Safely remove existing effects to prevent concurrent modification or overlap
-    children.whereType<ScaleEffect>().toList().forEach(
-      (e) => e.removeFromParent(),
-    );
-    children.whereType<RotateEffect>().toList().forEach(
-      (e) => e.removeFromParent(),
-    );
-
-    if (value) {
-      add(
-        ScaleEffect.to(
-          Vector2.all(1.1),
-          EffectController(duration: 0.3, reverseDuration: 0.3, infinite: true),
-        ),
-      );
-      // Spin once when lifted
-      add(
-        RotateEffect.by(
-          pi * 2,
-          EffectController(duration: 0.3, curve: Curves.easeOut),
-        ),
-      );
-    } else {
+    // Removed high-intensity scale loops and rotations to satisfy User design request for 'clean/normal' feel.
+    // Visual feedback is handled elegantly and instantly inside the high-performance render call.
+    if (!value) {
       scale = Vector2.all(1.0);
     }
   }
@@ -277,13 +257,13 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
 
   void _drawBolt(Canvas canvas) {
     // A. DYNAMIC SHADOW - Must update based on active orientation relative to light source
-    final scaleFactor = (isLifted ? 1.3 : 1.0) * scale.x;
-    final worldOffset = isLifted ? Vector2(0.2, 0.4) : Vector2(0.05, 0.1);
+    final scaleFactor = (isLifted ? 1.15 : 1.0) * scale.x; // Tuned down from 1.3 for subtle pop
+    final worldOffset = isLifted ? Vector2(0.15, 0.25) : Vector2(0.05, 0.1);
     final localOffset = worldOffset..rotate(-body.angle);
     final shadowOffset = Offset(localOffset.x, localOffset.y);
 
     _shadowPaint
-      ..color = Colors.black.withOpacity(isLifted ? 0.6 : 0.5)
+      ..color = Colors.black.withOpacity(isLifted ? 0.5 : 0.5)
       ..maskFilter = isLifted ? _blurLifted : _blurNormal;
 
     canvas.drawCircle(shadowOffset, radius, _shadowPaint);
@@ -291,10 +271,9 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
     // B. GOD-TIER CACHE BLAST - Blasts static geometry straight to hardware
     canvas.save();
     canvas.scale(scaleFactor);
-    if (isLifted) {
-      canvas.rotate(0.35);
-    }
-
+    // User explicitly demanded 'Normal' feel without heavy spinning/locking logic.
+    // Automatic visual skew rotation removed.
+    
     if (_cachedBoltPicture != null) {
       canvas.drawPicture(_cachedBoltPicture!);
     }

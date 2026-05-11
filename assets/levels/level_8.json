@@ -1,5 +1,6 @@
 {
-  "bolts": [
+  "timeLimit": 160,
+"bolts": [
     {"x": -3.0, "y": 17.0, "isRusty": true},
     {"x":  0.0, "y": 17.0, "isRusty": true},
     {"x":  3.0, "y": 17.0, "isRusty": true},
