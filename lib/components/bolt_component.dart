@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flame/components.dart';
 import 'package:flame/effects.dart';
 import 'package:flame/events.dart';
@@ -14,7 +15,13 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
   final double radius;
   final Vector2 initialPosition;
   bool isRusty;
-  int hitsRemaining;
+  int _hitsRemaining;
+  int get hitsRemaining => _hitsRemaining;
+  set hitsRemaining(int value) {
+    if (_hitsRemaining == value) return;
+    _hitsRemaining = value;
+    _buildCachedBolt(); // Re-record visual state to GPU on damage taken
+  }
   HoleComponent? previousHole;
 
   // CACHED PAINTS & SHADERS: Prevents creation of objects during the render loop
@@ -47,11 +54,13 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
   static final _blurLifted = MaskFilter.blur(BlurStyle.normal, 0.2);
   static final _blurNormal = MaskFilter.blur(BlurStyle.normal, 0.08);
 
+  Picture? _cachedBoltPicture; // Hardened hardware cache
+
   BoltComponent({
     required this.initialPosition,
     this.radius = 0.40,
     this.isRusty = false,
-  }) : hitsRemaining = isRusty ? 5 : 1,
+  }) : _hitsRemaining = isRusty ? 5 : 1,
        super(renderBody: false);
 
   void shake() {
@@ -140,136 +149,92 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
   Future<void> onLoad() async {
     await super.onLoad();
     priority = 3;
+    _buildCachedBolt(); // Record initial visual footprint
   }
 
   final PositionComponent _visualOffset = PositionComponent();
 
   @override
-  void render(Canvas canvas) {
-    canvas.save();
-    // Shift the rendering by our animated offset
-    canvas.translate(_visualOffset.x, _visualOffset.y);
-    _drawBolt(canvas);
-    canvas.restore();
-  }
+  void _buildCachedBolt() {
+    final recorder = PictureRecorder();
+    final canvas = Canvas(recorder);
 
-  void _drawBolt(Canvas canvas) {
-    // 1. Optimize Shadow Calculation: Directly set reuseable paint state
-    final scaleFactor = (isLifted ? 1.3 : 1.0) * scale.x;
-    final blurIntensity = isLifted ? 0.2 : 0.08;
-
-    final worldOffset = isLifted ? Vector2(0.2, 0.4) : Vector2(0.05, 0.1);
-    final localOffset = worldOffset..rotate(-body.angle);
-    final shadowOffset = Offset(localOffset.x, localOffset.y);
-
-    // Configure reusable shadow paint
-    _shadowPaint
-      ..color = Colors.black.withOpacity(isLifted ? 0.6 : 0.5)
-      ..maskFilter = isLifted ? _blurLifted : _blurNormal;
-
-    canvas.drawCircle(shadowOffset, radius, _shadowPaint);
-
-    // 2. Pre-allocate constant drawing rect for shaders
     final rect = Rect.fromCircle(center: Offset.zero, radius: radius);
 
-    // SMART SHADER CACHE: Check hash to see if rusty progression changed
+    // 1. PRE-RENDER GRADIENTS & CRACKS
     final int currentStateHash = (isRusty ? 1000 : 0) + hitsRemaining;
+    
+    // Forces shader refresh logic
+    final progress = isRusty ? (hitsRemaining / 5.0) : 0.0;
+    final rustColors = [
+      const Color(0xFFD35400),
+      const Color(0xFF8E44AD),
+      const Color(0xFF3E2723),
+    ];
+    final cleanColors = [
+      const Color(0xFFFFEB3B),
+      const Color(0xFFFBC02D),
+      const Color(0xFFF9A825),
+    ];
 
-    if (_cachedHeadShader == null || _lastHashState != currentStateHash) {
-      _lastHashState = currentStateHash;
+    final colors = [
+      Color.lerp(cleanColors[0], rustColors[0], progress)!,
+      Color.lerp(cleanColors[1], rustColors[1], progress)!,
+      Color.lerp(cleanColors[2], rustColors[2], progress)!,
+    ];
 
-      final progress = isRusty ? (hitsRemaining / 5.0) : 0.0;
-      final rustColors = [
-        const Color(0xFFD35400),
-        const Color(0xFF8E44AD),
-        const Color(0xFF3E2723),
-      ];
-      final cleanColors = [
-        const Color(0xFFFFEB3B),
-        const Color(0xFFFBC02D),
-        const Color(0xFFF9A825),
-      ];
+    final headShader = RadialGradient(
+      center: const Alignment(-0.4, -0.4),
+      colors: colors,
+      stops: const [0.0, 0.4, 1.0],
+    ).createShader(rect);
 
-      // Manual lerp to avoid List.generate dynamic lists memory footprint
-      final colors = [
-        Color.lerp(cleanColors[0], rustColors[0], progress)!,
-        Color.lerp(cleanColors[1], rustColors[1], progress)!,
-        Color.lerp(cleanColors[2], rustColors[2], progress)!,
-      ];
+    _cachedSlotShader ??= LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [Colors.black, const Color(0xFF2C3E50)],
+    ).createShader(rect);
 
-      _cachedHeadShader = RadialGradient(
-        center: const Alignment(-0.4, -0.4),
-        colors: colors,
-        stops: const [0.0, 0.4, 1.0],
-      ).createShader(rect);
-
-      // Slot Shader Cache
-      _cachedSlotShader ??= LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Colors.black, const Color(0xFF2C3E50)],
-      ).createShader(rect);
-
-      // PRECOMPUTE CRACKS OPTIMIZATION:
-      // Construct geometry ONLY when hitsRemaining changes! Never perform Trigonometry per-frame.
-      if (isRusty && hitsRemaining < 5) {
-        final newCrackPath = Path();
-        final fixedSeed = initialPosition.x.toInt() ^ initialPosition.y.toInt();
-        final staticRandom = Random(fixedSeed);
-
-        for (var i = 0; i < (5 - hitsRemaining) * 3; i++) {
-          final double angle = staticRandom.nextDouble() * pi * 2;
-          final double r1 = staticRandom.nextDouble() * radius;
-          final double r2 = r1 + 0.2;
-
-          newCrackPath.moveTo(cos(angle) * r1, sin(angle) * r1);
-          newCrackPath.lineTo(cos(angle + 0.2) * r2, sin(angle + 0.2) * r2);
-        }
-        _cachedCrackPath = newCrackPath;
-      } else {
-        _cachedCrackPath = null;
+    Path? crackPath;
+    if (isRusty && hitsRemaining < 5) {
+      final newPath = Path();
+      final fixedSeed = initialPosition.x.toInt() ^ initialPosition.y.toInt();
+      final staticRandom = Random(fixedSeed);
+      for (var i = 0; i < (5 - hitsRemaining) * 3; i++) {
+        final double angle = staticRandom.nextDouble() * pi * 2;
+        final double r1 = staticRandom.nextDouble() * radius;
+        final double r2 = r1 + 0.2;
+        newPath.moveTo(cos(angle) * r1, sin(angle) * r1);
+        newPath.lineTo(cos(angle + 0.2) * r2, sin(angle + 0.2) * r2);
       }
+      crackPath = newPath;
     }
 
-    _headPaint.shader = _cachedHeadShader;
-
-    canvas.save();
-    canvas.scale(scaleFactor);
-
-    // Draw Metal Head
+    // 2. DRAW STATIC HEAD & RUST
+    _headPaint.shader = headShader;
     canvas.drawCircle(Offset.zero, radius, _headPaint);
 
-    // 3. Rust Layer optimization
     if (isRusty) {
-      final progress = hitsRemaining / 5.0;
       canvas.drawCircle(
         Offset.zero,
         radius * 0.7,
         _rustTexturePaint..color = Colors.black.withOpacity(0.3 * progress),
       );
       canvas.drawCircle(Offset.zero, radius * 0.4, _rustTexturePaint);
-
-      if (_cachedCrackPath != null) {
+      if (crackPath != null) {
         _crackPaint.color = Colors.black.withOpacity(0.4 * (1 - progress));
-        canvas.drawPath(_cachedCrackPath!, _crackPaint);
+        canvas.drawPath(crackPath, _crackPaint);
       }
     }
 
-    // 4. Beveled Highlight
+    // 3. BEVEL & SLOTS
     canvas.drawCircle(Offset.zero, radius * 0.95, _rimHighlight);
 
-    // 5. Slot Painting Optimization
-    final isTorx =
-        (initialPosition.x.toInt() + initialPosition.y.toInt()) % 5 == 0;
-
+    final isTorx = (initialPosition.x.toInt() + initialPosition.y.toInt()) % 5 == 0;
     _slotPaint.shader = _cachedSlotShader;
     _slotPaint.strokeWidth = isTorx ? 0.08 : 0.12;
     _shadowSlotPaint.color = Colors.black.withOpacity(0.5);
     _shadowSlotPaint.strokeWidth = isTorx ? 0.10 : 0.14;
-
-    if (isLifted) {
-      canvas.rotate(0.35);
-    }
 
     void drawPhillips(Paint p) {
       canvas.drawLine(Offset(-radius * 0.4, 0), Offset(radius * 0.4, 0), p);
@@ -285,12 +250,8 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
           p,
         );
       }
-      canvas.drawCircle(
-        Offset.zero,
-        radius * 0.15,
-        p..style = PaintingStyle.fill,
-      );
-      p.style = PaintingStyle.stroke; // restore after fill
+      canvas.drawCircle(Offset.zero, radius * 0.15, p..style = PaintingStyle.fill);
+      p.style = PaintingStyle.stroke;
     }
 
     if (isTorx) {
@@ -301,7 +262,49 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
       drawPhillips(_slotPaint);
     }
 
+    // 4. FINALIZE CACHE
+    _cachedBoltPicture?.dispose();
+    _cachedBoltPicture = recorder.endRecording();
+  }
+
+  @override
+  void render(Canvas canvas) {
+    canvas.save();
+    canvas.translate(_visualOffset.x, _visualOffset.y);
+    _drawBolt(canvas);
     canvas.restore();
+  }
+
+  void _drawBolt(Canvas canvas) {
+    // A. DYNAMIC SHADOW - Must update based on active orientation relative to light source
+    final scaleFactor = (isLifted ? 1.3 : 1.0) * scale.x;
+    final worldOffset = isLifted ? Vector2(0.2, 0.4) : Vector2(0.05, 0.1);
+    final localOffset = worldOffset..rotate(-body.angle);
+    final shadowOffset = Offset(localOffset.x, localOffset.y);
+
+    _shadowPaint
+      ..color = Colors.black.withOpacity(isLifted ? 0.6 : 0.5)
+      ..maskFilter = isLifted ? _blurLifted : _blurNormal;
+
+    canvas.drawCircle(shadowOffset, radius, _shadowPaint);
+
+    // B. GOD-TIER CACHE BLAST - Blasts static geometry straight to hardware
+    canvas.save();
+    canvas.scale(scaleFactor);
+    if (isLifted) {
+      canvas.rotate(0.35);
+    }
+
+    if (_cachedBoltPicture != null) {
+      canvas.drawPicture(_cachedBoltPicture!);
+    }
+    canvas.restore();
+  }
+
+  @override
+  void onRemove() {
+    _cachedBoltPicture?.dispose();
+    super.onRemove();
   }
 
   @override

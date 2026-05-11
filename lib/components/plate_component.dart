@@ -413,29 +413,9 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
       canvas.drawPicture(_cachedPlatePicture!);
     }
 
-    // 3. Optimized Glint (Still dynamic because position translates based on timer)
-    final glintProgress = (_glintTimer % 5.0) / 5.0;
-    final glintX = -size.x + (glintProgress * size.x * 6);
-
-    _glintShader ??= LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [
-        Colors.white.withOpacity(0.0),
-        Colors.white.withOpacity(0.15),
-        Colors.white.withOpacity(0.0),
-      ],
-    ).createShader(Rect.fromLTWH(0, -size.y, size.x * 0.4, size.y * 2));
-
-    _glintPaint.shader = _glintShader;
-
-    canvas.save();
-    canvas.clipPath(_platePath);
-    canvas.translate(glintX, 0);
-    // SAFETY BOUNDING: Using restricted DrawRect ensures absolute zero bleed outside the clip region,
-    // preventing accidental white-screen fill artifacts on certain hardware.
-    canvas.drawRect(Rect.fromLTWH(-size.x * 2, -size.y * 2, size.x * 4, size.y * 4), _glintPaint);
-    canvas.restore();
+    // 3. PREVIOUS PER-FRAME GLINT REMOVED FOR ULTIMATE 60FPS STABILITY.
+    // Stencil clipping path triggers heavy software rendering path on older hardware.
+    // Absolute raw pre-recorded hardware picture provides ultimate rendering speed.
   }
   
   @override
