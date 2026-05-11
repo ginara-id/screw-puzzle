@@ -616,11 +616,11 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          _buildBoosterItem(Icons.radar, 'SCAN', const Color(0xFFFFD600)),
-                          const SizedBox(width: 16),
-                          _buildBoosterItem(Icons.build, 'REMOVE', const Color(0xFFFF9800)),
-                          const SizedBox(width: 16),
-                          _buildBoosterItem(Icons.bolt_rounded, 'STORM', const Color(0xFF00E5FF), onTap: widget.game.useRustCleanseBooster),
+                           _buildBoosterItem(Icons.ac_unit_rounded, 'CHRONOS', const Color(0xFF00E5FF), onTap: widget.game.useTimeFreezeBooster),
+                           const SizedBox(width: 16),
+                           _buildBoosterItem(Icons.gavel_rounded, 'SMASH', const Color(0xFFFF9800), onTap: widget.game.usePlateSmashBooster),
+                           const SizedBox(width: 16),
+                           _buildBoosterItem(Icons.bolt_rounded, 'STORM', const Color(0xFFFFD600), onTap: widget.game.useRustCleanseBooster),
                         ],
                       ),
                       
@@ -720,22 +720,32 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
                                 );
                               },
                             ),
-                            Text(
-                              '$minutes:$seconds',
-                              style: TextStyle(
-                                color: isLowTime 
-                                  ? (time.floor() % 2 == 0 ? const Color(0xFFFF3333) : Colors.white)
-                                  : Colors.white,
-                                fontSize: 32,
-                                fontWeight: FontWeight.w900,
-                                fontFamily: 'Courier',
-                                shadows: [
-                                  Shadow(
-                                    color: isLowTime ? const Color(0xFFFF3333) : const Color(0xFFFFD600).withOpacity(0.6), 
-                                    blurRadius: 15
-                                  )
-                                ],
-                              ),
+                            ValueListenableBuilder<bool>(
+                              valueListenable: widget.game.timeFrozenNotifier,
+                              builder: (context, isFrozen, _) {
+                                final isLowTime = time < 10 && !isFrozen;
+                                return Text(
+                                  '$minutes:$seconds',
+                                  style: TextStyle(
+                                    color: isFrozen 
+                                      ? const Color(0xFF00E5FF) 
+                                      : (isLowTime 
+                                          ? (time.floor() % 2 == 0 ? const Color(0xFFFF3333) : Colors.white)
+                                          : Colors.white),
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.w900,
+                                    fontFamily: 'Courier',
+                                    shadows: [
+                                      Shadow(
+                                        color: isFrozen 
+                                          ? const Color(0xFF00E5FF).withOpacity(0.6) 
+                                          : (isLowTime ? const Color(0xFFFF3333) : const Color(0xFFFFD600).withOpacity(0.6)),
+                                        blurRadius: 15,
+                                      )
+                                    ],
+                                  ),
+                                );
+                              }
                             ),
                             Text(
                               'TIME REMAINING',

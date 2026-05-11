@@ -141,6 +141,8 @@ class ScrewPuzzleGame extends Forge2DGame {
     _remainingTime = seconds;
   }
 
+  bool _isTimeFrozen = false;
+  final timeFrozenNotifier = ValueNotifier<bool>(false);
   double _victoryCheckTimer = 0;
 
   // COMBO SYSTEM
@@ -177,7 +179,7 @@ class ScrewPuzzleGame extends Forge2DGame {
     final isInGame = overlays.isActive('HUD') && !overlays.isActive('MainMenu');
 
     // --- ABSOLUTE REAL-TIME CLOCK (FIXED!): Subtracts raw wall-clock time ---
-    if (isInGame && !_isVictoryTriggered && !_isGameOver) {
+    if (isInGame && !_isVictoryTriggered && !_isGameOver && !_isTimeFrozen) {
       _remainingTime -= clockDt; // USES UNCLAMPED REAL-TIME VALUE!
       if (_remainingTime <= 0) {
         _remainingTime = 0;
@@ -302,6 +304,8 @@ class ScrewPuzzleGame extends Forge2DGame {
 
   Future<void> nextLevel() async {
     _isVictoryTriggered = false;
+    _isTimeFrozen = false;
+    timeFrozenNotifier.value = false;
     currentLevel++;
 
     // PERSISTENCE: Save progress
@@ -328,6 +332,8 @@ class ScrewPuzzleGame extends Forge2DGame {
   void resetLevel({TransitionMode mode = TransitionMode.closeAndOpen}) {
     _isVictoryTriggered = false;
     _isGameOver = false;
+    _isTimeFrozen = false;
+    timeFrozenNotifier.value = false;
     _remainingTime = _levelTimeLimit; // Uses custom time limit from JSON
     levelManager.loadLevel(currentLevel, transitionMode: mode);
   }
@@ -383,6 +389,53 @@ class ScrewPuzzleGame extends Forge2DGame {
 
     // Final confirmation chime when complete!
     audio.playSfx('victory.wav', volume: 0.7);
+  }
+
+  /// SPECIAL ABILITY: Freezes the countdown timer for 10 seconds.
+  Future<void> useTimeFreezeBooster() async {
+    if (_isGameOver || _isVictoryTriggered || _isTimeFrozen) return;
+
+    _isTimeFrozen = true;
+    timeFrozenNotifier.value = true;
+    audio.playBoosterClick();
+    
+    // Visual feedback: Slight camera zoom or flash could go here
+    
+    await Future.delayed(const Duration(seconds: 10));
+    
+    _isTimeFrozen = false;
+    timeFrozenNotifier.value = false;
+    audio.playBoltSnap(); // Chime to indicate time resumed
+  }
+
+  /// SPECIAL ABILITY: Destroys a random plate from the board to help unblock.
+  void usePlateSmashBooster() {
+    if (_isGameOver || _isVictoryTriggered) return;
+
+    final plates = world.children.whereType<PlateComponent>().toList();
+    if (plates.isEmpty) {
+      audio.playBoosterClick();
+      return;
+    }
+
+    // TARGETING: Pick the plate with the fewest joints (easiest to remove)
+    plates.sort((a, b) => _plateJointCount(a).compareTo(_plateJointCount(b)));
+    final target = plates.first;
+
+    // EXPLOSION EFFECT
+    showSmashEffect(target.body.position);
+    audio.playPlateCollision(volume: 1.0);
+    shakeCamera(intensity: 1.5, duration: 0.5);
+
+    // Remove joints first
+    for (final joints in _boltJoints.values) {
+      joints.removeWhere((j) => j.bodyB == target.body);
+    }
+    
+    target.removeFromParent();
+    
+    // Clean up any orphans
+    _checkFailCondition();
   }
 
   void clearLevelState() {
@@ -920,6 +973,60 @@ class ScrewPuzzleGame extends Forge2DGame {
 
     text.add(MoveByEffect(Vector2(0, -5), EffectController(duration: 1.5, curve: Curves.easeOutCubic)));
     text.add(OpacityEffect.fadeOut(EffectController(duration: 0.6, startDelay: 0.8), onComplete: () => text.removeFromParent()));
+  }
+
+  /// ULTIMATE DESTRUCTION: Cinematic explosion effect for the SMASH booster.
+  void showSmashEffect(Vector2 position) {
+    // 1. MASSIVE PARTICLE BURST
+    createSparks(position, isLightning: true); // Multi-color sparks
+    createSparks(position, isMetalDust: true); // Metal debris
+
+    // 2. EXPLOSIVE GHOST CIRCLE (Shockwave)
+    final shockwave = CircleComponent(
+      radius: 0.1,
+      position: position.clone(),
+      anchor: Anchor.center,
+      paint: Paint()..color = Colors.white.withOpacity(0.8)..style = PaintingStyle.stroke..strokeWidth = 0.2,
+    );
+    world.add(shockwave);
+    shockwave.add(ScaleEffect.to(Vector2.all(40.0), EffectController(duration: 0.4, curve: Curves.easeOutExpo)));
+    shockwave.add(OpacityEffect.fadeOut(EffectController(duration: 0.4), onComplete: () => shockwave.removeFromParent()));
+
+    // 3. CINEMATIC "SMASH!" TEXT POP
+    final text = ComboTextComponent(
+      text: 'SMASH!',
+      position: position.clone(),
+      anchor: Anchor.center,
+      priority: 2000,
+      textRenderer: TextPaint(
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 32.0,
+          fontWeight: FontWeight.w900,
+          fontFamily: 'Courier',
+          fontStyle: FontStyle.italic,
+          shadows: [
+            Shadow(color: Color(0xFFFF3D00), blurRadius: 20),
+            Shadow(color: Color(0xFFFF9100), blurRadius: 40),
+            Shadow(color: Colors.black, offset: Offset(4, 4), blurRadius: 10),
+          ],
+        ),
+      ),
+    )..scale = Vector2.all(0.001);
+
+    world.add(text);
+
+    // Violent explosive scaling
+    text.add(
+      SequenceEffect([
+        ScaleEffect.to(Vector2.all(0.04), EffectController(duration: 0.15, curve: Curves.easeOutExpo)),
+        ScaleEffect.to(Vector2.all(0.03), EffectController(duration: 0.1, curve: Curves.bounceOut)),
+      ]),
+    );
+
+    // Fade and lift
+    text.add(MoveByEffect(Vector2(0, -4), EffectController(duration: 1.0, curve: Curves.easeOutCubic)));
+    text.add(OpacityEffect.fadeOut(EffectController(duration: 0.4, startDelay: 0.6), onComplete: () => text.removeFromParent()));
   }
 }
 
