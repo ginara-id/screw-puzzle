@@ -6,9 +6,12 @@ import 'utils/overlay_manager.dart';
 import 'utils/ad_service.dart';
 import 'screens/splash_screen.dart';
 
+import 'utils/lang_service.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AdService().init();
+  await LangService().init(); // HIGH-PERFORMANCE GLOBAL TRANSLATION SYSTEM
 
   runApp(const MyApp());
 }
@@ -18,10 +21,15 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      // Set our beautiful interactive cyber splash as initial screen!
-      home: const SplashScreen(),
+    return ValueListenableBuilder<String>(
+      valueListenable: LangService().localeNotifier,
+      builder: (context, _, __) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          // Set our beautiful interactive cyber splash as initial screen!
+          home: const SplashScreen(),
+        );
+      }
     );
   }
 }

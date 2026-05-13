@@ -188,7 +188,7 @@ class LevelManager {
             }
           });
         } else if (levelNumber == 2) {
-          game.tutorialStepNotifier.value = TutorialStep.introBoosters;
+          game.tutorialStepNotifier.value = TutorialStep.explainRust;
           Future.delayed(const Duration(milliseconds: 1200), () {
             if (game.currentLevel == 2 && !game.overlays.isActive('MainMenu')) {
               game.overlays.add('Tutorial');

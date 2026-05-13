@@ -64,6 +64,7 @@ class AdService {
     required Function() onRewardEarned,
     Function()? onAdLoaded,
     Function()? onAdFailed,
+    Function()? onAdDismissed,
   }) {
     RewardedAd.load(
       adUnitId: rewardedAdUnitId,
@@ -75,10 +76,12 @@ class AdService {
           ad.fullScreenContentCallback = FullScreenContentCallback(
             onAdDismissedFullScreenContent: (ad) {
               ad.dispose();
+              if (onAdDismissed != null) onAdDismissed();
             },
             onAdFailedToShowFullScreenContent: (ad, error) {
               ad.dispose();
               if (onAdFailed != null) onAdFailed();
+              if (onAdDismissed != null) onAdDismissed(); // Safety fallback unpause
             },
           );
           ad.show(
@@ -90,6 +93,7 @@ class AdService {
         onAdFailedToLoad: (error) {
           print('RewardedAd failed to load: $error');
           if (onAdFailed != null) onAdFailed();
+          if (onAdDismissed != null) onAdDismissed(); // Safety fallback unpause
         },
       ),
     );

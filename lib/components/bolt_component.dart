@@ -60,7 +60,7 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
     required this.initialPosition,
     this.radius = 0.40,
     this.isRusty = false,
-  }) : _hitsRemaining = isRusty ? 5 : 1,
+  }) : _hitsRemaining = isRusty ? 6 : 1,
        super(renderBody: false);
 
   void shake() {
@@ -145,7 +145,7 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
     final int currentStateHash = (isRusty ? 1000 : 0) + hitsRemaining;
     
     // Forces shader refresh logic
-    final progress = isRusty ? (hitsRemaining / 5.0) : 0.0;
+    final progress = isRusty ? (hitsRemaining / 6.0) : 0.0;
     final rustColors = [
       const Color(0xFFD35400),
       const Color(0xFF8E44AD),
@@ -176,11 +176,11 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
     ).createShader(rect);
 
     Path? crackPath;
-    if (isRusty && hitsRemaining < 5) {
+    if (isRusty && hitsRemaining < 6) {
       final newPath = Path();
       final fixedSeed = initialPosition.x.toInt() ^ initialPosition.y.toInt();
       final staticRandom = Random(fixedSeed);
-      for (var i = 0; i < (5 - hitsRemaining) * 3; i++) {
+      for (var i = 0; i < (6 - hitsRemaining) * 3; i++) {
         final double angle = staticRandom.nextDouble() * pi * 2;
         final double r1 = staticRandom.nextDouble() * radius;
         final double r2 = r1 + 0.2;

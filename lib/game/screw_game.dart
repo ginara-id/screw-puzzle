@@ -18,6 +18,7 @@ import '../components/timer_text.dart';
 import '../utils/level_manager.dart';
 import '../utils/audio_service.dart';
 import '../utils/ad_service.dart';
+import '../utils/lang_service.dart';
 
 enum TutorialStep {
   welcome,
@@ -31,6 +32,9 @@ enum TutorialStep {
   moveCenterBolt,
   
   // Level 2: Interactive Booster Trials
+  explainRust,
+  selectTutorialRustBolt,
+  moveTutorialRustBolt,
   introBoosters,
   tryStorm,
   explainSmash,
@@ -80,6 +84,8 @@ class ScrewPuzzleGame extends Forge2DGame {
   final stormCountNotifier = ValueNotifier<int>(2);
   final smashCountNotifier = ValueNotifier<int>(2);
   final chronosCountNotifier = ValueNotifier<int>(2);
+  final alertNotifier = ValueNotifier<String?>(null);
+  final rustTutorialHitsNotifier = ValueNotifier<int>(6);
 
   // RETENTION OPTIMIZATION: Regulate interstitial ad frequency pacing
   int _gamesSinceLastInterstitial = 0;
@@ -195,19 +201,21 @@ class ScrewPuzzleGame extends Forge2DGame {
     print('\n=== 🛡️ [AD_PACS] MEMULAI EVALUASI IKLAN INTERSTITIAL ===');
     print('📄 Level Saat Ini: $currentLevel');
     
-    // GATE 1: Level Restriction Check
-    if (currentLevel < 1) {
-      print('⛔ [AD_PACS] DILEWATI: Level $currentLevel masih di bawah batas aman bebas iklan.');
+    // GATE 1: Level Restriction Check (Safe Early Level Gating)
+    // Memblokir total iklan di Level 1, 2, dan 3 demi mengamankan impresi pertama pemain.
+    if (currentLevel <= 3) {
+      print('⛔ [AD_PACS] DILEWATI: Level $currentLevel <= 3 dijamin 100% bebas iklan demi retensi awal.');
       print('====================================================\n');
       onComplete();
       return;
     }
 
     _gamesSinceLastInterstitial++;
-    print('📈 Hitung Game Sejak Iklan Terakhir: $_gamesSinceLastInterstitial / 1 (Target)');
+    print('📈 Hitung Game Sejak Iklan Terakhir: $_gamesSinceLastInterstitial / 2 (Target)');
 
-    // GATE 2: Frequency Cap Check
-    if (_gamesSinceLastInterstitial >= 1) {
+    // GATE 2: Frequency Cap Check (Production Pacing)
+    // Iklan hanya boleh terbit tepat setiap 2 kali babak selesai secara berkala.
+    if (_gamesSinceLastInterstitial >= 2) {
       print('🎬 [AD_PACS] DISETUJUI: Memuat & Menampilkan Iklan Layar Penuh...');
       _gamesSinceLastInterstitial = 0;
       
@@ -219,10 +227,23 @@ class ScrewPuzzleGame extends Forge2DGame {
         },
       );
     } else {
-      print('⏳ [AD_PACS] DILEWATI: Jumlah game belum mencapai kuota pacing.');
+      print('⏳ [AD_PACS] DILEWATI: Pacing belum terpenuhi ($_gamesSinceLastInterstitial/2). Kenyamanan user terjaga.');
       print('====================================================\n');
       onComplete();
     }
+  }
+
+  /// Triggers a HUD alert message with negative feedback chime.
+  void triggerAlert(String message) {
+    alertNotifier.value = message;
+    audio.playBoltSnap(); // Deny snap feedback!
+    
+    // Auto-clears the message after 1.5s
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (alertNotifier.value == message) {
+        alertNotifier.value = null;
+      }
+    });
   }
 
   bool _isTimeFrozen = false;
@@ -352,7 +373,7 @@ class ScrewPuzzleGame extends Forge2DGame {
   }
 
   void _triggerGameOver() {
-    if (_isGameOver) return;
+    if (_isGameOver || _isVictoryTriggered) return;
     _isGameOver = true;
     // No more flame-based banners, rely on the Flutter UI overlay
 
@@ -369,7 +390,7 @@ class ScrewPuzzleGame extends Forge2DGame {
   // Removed old static showScoreEffect
 
   void _triggerVictorySequence() {
-    if (_isVictoryTriggered || overlays.isActive('WinMenu')) return;
+    if (_isVictoryTriggered || _isGameOver || overlays.isActive('WinMenu')) return;
     _isVictoryTriggered = true;
 
     // Spawn the level clear effect (sparks/shockwave) right on the screen center
@@ -407,8 +428,7 @@ class ScrewPuzzleGame extends Forge2DGame {
 
   Future<void> nextLevel() async {
     _isVictoryTriggered = false;
-    _isTimeFrozen = false;
-    timeFrozenNotifier.value = false;
+    _clearTimeFreeze();
     currentLevel++;
 
     // PERSISTENCE: Save progress
@@ -435,10 +455,16 @@ class ScrewPuzzleGame extends Forge2DGame {
   void resetLevel({TransitionMode mode = TransitionMode.closeAndOpen}) {
     _isVictoryTriggered = false;
     _isGameOver = false;
-    _isTimeFrozen = false;
-    timeFrozenNotifier.value = false;
+    _clearTimeFreeze();
     _remainingTime = _levelTimeLimit; // Uses custom time limit from JSON
     levelManager.loadLevel(currentLevel, transitionMode: mode);
+  }
+
+  void _clearTimeFreeze() {
+    _isTimeFrozen = false;
+    timeFrozenNotifier.value = false;
+    _freezeDurationRemaining = 0.0;
+    freezeDurationNotifier.value = 0.0;
   }
 
   /// SPECIAL ABILITY: Unleashes a lightning storm that clears all Rust from bolts sequentially.
@@ -451,7 +477,7 @@ class ScrewPuzzleGame extends Forge2DGame {
         .toList();
 
     if (rustyBolts.isEmpty) {
-      audio.playBoosterClick();
+      triggerAlert(LangService.t('hud_alert_storm_no_rust'));
       return;
     }
 
@@ -625,6 +651,22 @@ class ScrewPuzzleGame extends Forge2DGame {
     final step = tutorialStepNotifier.value;
     if (step != null) {
       bool isValidTap = false;
+
+      // PHASE 1: INTERACTIVE RUST INTERCEPTION (Manual tapping 6 times)
+      if (step == TutorialStep.explainRust) {
+        // Validate tap on the top-left target rusty bolt
+        isValidTap = (bolt.body.position.x - (-2.0)).abs() < 0.5;
+        if (!isValidTap) {
+          bolt.shake();
+          return; // Block tapping other items during education
+        }
+        // ALLOW to fall through to let normal rust physics & deduction execute!
+      }
+
+      if (step == TutorialStep.selectTutorialRustBolt || step == TutorialStep.moveTutorialRustBolt) {
+        isValidTap = (bolt.body.position.x - (-2.0)).abs() < 0.5 && (bolt.body.position.y - 20.0).abs() < 0.5;
+      }
+
       if (step == TutorialStep.selectLeftBolt || step == TutorialStep.moveLeftBolt) {
         isValidTap = (bolt.body.position.x - (-2.0)).abs() < 0.5;
       } else if (step == TutorialStep.selectRightBolt || step == TutorialStep.moveRightBolt) {
@@ -644,8 +686,12 @@ class ScrewPuzzleGame extends Forge2DGame {
       bolt.hitsRemaining--;
       bolt.shake(); // Visual jiggle
       createSparks(bolt.body.position, isMetalDust: true); // Brown/Grey dust
-      audio.playBoltTap(); // We could add a 'scrape' sound later
-      // HapticFeedback.lightImpact(); DISABLED
+      audio.playBoltTap(); // Mechanical tap feedback
+      
+      // DYNAMIC TUTORIAL SINK: Feed current remaining hits directly to the UI overlay!
+      if (tutorialStepNotifier.value == TutorialStep.explainRust) {
+        rustTutorialHitsNotifier.value = bolt.hitsRemaining;
+      }
       return;
     }
 
@@ -654,7 +700,12 @@ class ScrewPuzzleGame extends Forge2DGame {
       bolt.isRusty = false;
       bolt.hitsRemaining = 1; // Standard hits
       createSparks(bolt.body.position); // Final bright spark
-      // HapticFeedback.mediumImpact(); DISABLED
+      
+      // TUTORIAL ADVANCEMENT: Trigger transition to selective moving once rust shatters!
+      if (tutorialStepNotifier.value == TutorialStep.explainRust) {
+        rustTutorialHitsNotifier.value = 0;
+        tutorialStepNotifier.value = TutorialStep.selectTutorialRustBolt;
+      }
     }
 
     if (_activeBolt == bolt) {
@@ -666,6 +717,7 @@ class ScrewPuzzleGame extends Forge2DGame {
       if (step == TutorialStep.moveLeftBolt) tutorialStepNotifier.value = TutorialStep.selectLeftBolt;
       if (step == TutorialStep.moveRightBolt) tutorialStepNotifier.value = TutorialStep.selectRightBolt;
       if (step == TutorialStep.moveCenterBolt) tutorialStepNotifier.value = TutorialStep.selectCenterBolt;
+      if (step == TutorialStep.moveTutorialRustBolt) tutorialStepNotifier.value = TutorialStep.selectTutorialRustBolt;
     } else {
       // Deselect old if any
       _activeBolt?.isLifted = false;
@@ -676,8 +728,9 @@ class ScrewPuzzleGame extends Forge2DGame {
 
       // Tutorial Advance
       if (step == TutorialStep.selectLeftBolt) tutorialStepNotifier.value = TutorialStep.moveLeftBolt;
-      if (step == TutorialStep.selectRightBolt) tutorialStepNotifier.value = TutorialStep.moveRightBolt;
+      if (step == TutorialStep.selectRightBolt) tutorialStepNotifier.value = TutorialStep.selectRightBolt;
       if (step == TutorialStep.selectCenterBolt) tutorialStepNotifier.value = TutorialStep.moveCenterBolt;
+      if (step == TutorialStep.selectTutorialRustBolt) tutorialStepNotifier.value = TutorialStep.moveTutorialRustBolt;
     }
     updateHoleHighlights();
   }
@@ -707,6 +760,8 @@ class ScrewPuzzleGame extends Forge2DGame {
         final isLeftVacant = (hole.position.x - (-2.0)).abs() < 0.5 && (hole.position.y - 18.0).abs() < 0.5;
         final isRightVacant = (hole.position.x - 2.0).abs() < 0.5 && (hole.position.y - 18.0).abs() < 0.5;
         isValidTarget = isLeftVacant || isRightVacant;
+      } else if (step == TutorialStep.moveTutorialRustBolt) {
+        isValidTarget = (hole.position.x - (-2.0)).abs() < 0.5 && (hole.position.y - 18.0).abs() < 0.5;
       }
 
       if (!isValidTarget) {
@@ -825,6 +880,8 @@ class ScrewPuzzleGame extends Forge2DGame {
           tutorialStepNotifier.value = TutorialStep.selectRightBolt;
         } else if (currentStep == TutorialStep.moveRightBolt) {
           tutorialStepNotifier.value = TutorialStep.explainSwing;
+        } else if (currentStep == TutorialStep.moveTutorialRustBolt) {
+          tutorialStepNotifier.value = TutorialStep.introBoosters;
         } else if (currentStep == TutorialStep.moveCenterBolt) {
           tutorialStepNotifier.value = null;
           overlays.remove('Tutorial');

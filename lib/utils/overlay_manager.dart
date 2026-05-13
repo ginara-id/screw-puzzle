@@ -6,6 +6,8 @@ import 'package:flame/components.dart';
 import 'package:screw_puzzle/utils/ad_service.dart';
 import '../game/screw_game.dart';
 import '../components/industrial_transition.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'lang_service.dart';
 
 class WinMenu extends StatelessWidget {
   final ScrewPuzzleGame game;
@@ -71,8 +73,8 @@ class WinMenu extends StatelessWidget {
                           size: 80,
                         ),
                         const SizedBox(height: 24),
-                        const Text(
-                          'SYSTEM CLEARED',
+                        Text(
+                          LangService.t('win_title'),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Color(0xFFFF9800),
@@ -97,7 +99,7 @@ class WinMenu extends StatelessWidget {
                         ),
                         const SizedBox(height: 40),
                         _buildMenuButton(
-                          label: 'ENGAGE NEXT',
+                          label: LangService.t('win_next'),
                           icon: Icons.double_arrow_rounded,
                           onPressed: () {
                             game.overlays.remove('WinMenu');
@@ -256,8 +258,8 @@ class GameOverMenu extends StatelessWidget {
                           size: 80,
                         ),
                         const SizedBox(height: 24),
-                        const Text(
-                          'SYSTEM JAMMED',
+                        Text(
+                          LangService.t('lose_title'),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.redAccent,
@@ -271,9 +273,9 @@ class GameOverMenu extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        const Text(
-                          'CRITICAL FAILURE DETECTED',
-                          style: TextStyle(
+                        Text(
+                          LangService.t('lose_subtitle'),
+                          style: const TextStyle(
                             color: Colors.redAccent,
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
@@ -282,7 +284,7 @@ class GameOverMenu extends StatelessWidget {
                         ),
                         const SizedBox(height: 40),
                         _buildMenuButton(
-                          label: 'REBOOT SYSTEM',
+                          label: LangService.t('lose_retry'),
                           icon: Icons.refresh_rounded,
                           onPressed: () {
                             game.overlays.remove('GameOverMenu');
@@ -844,7 +846,7 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
                               }
                             ),
                             Text(
-                              'TIME REMAINING',
+                              LangService.t('hud_time_remaining'),
                               style: TextStyle(
                                 color: const Color(0xFFFFD600).withOpacity(0.6), 
                                 fontSize: 8,
@@ -858,6 +860,69 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
                       ),
                     ],
                   ),
+                ),
+              ),
+              
+              // 6. DYNAMIC FLOATING HUD ALERTS (Cyber Warning System)
+              Positioned(
+                top: MediaQuery.of(context).size.height * 0.45, // Centered but slightly above midpoint
+                left: 0,
+                right: 0,
+                child: ValueListenableBuilder<String?>(
+                  valueListenable: widget.game.alertNotifier,
+                  builder: (context, message, _) {
+                    if (message == null) return const SizedBox.shrink();
+                    
+                    return TweenAnimationBuilder<double>(
+                      tween: Tween<double>(begin: 0.0, end: 1.0),
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeOutBack,
+                      builder: (context, scale, _) {
+                        return Transform.scale(
+                          scale: scale,
+                          child: Center(
+                            child: IgnorePointer(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: Colors.black,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: const Color(0xFFFF3D00), width: 1.5), // Danger Red/Orange
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFFFF3D00).withOpacity(0.35),
+                                      blurRadius: 20,
+                                    )
+                                  ]
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.warning_amber_rounded,
+                                      color: Color(0xFFFF3D00),
+                                      size: 16,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Text(
+                                      message,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w900,
+                                        fontFamily: 'monospace',
+                                        letterSpacing: 1.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+                    );
+                  }
                 ),
               ),
             ],
@@ -938,19 +1003,21 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: isLocked ? Colors.black.withOpacity(0.6) : Colors.black.withOpacity(0.4),
+                    color: isClickBlocked ? Colors.black.withOpacity(0.6) : Colors.black.withOpacity(0.4),
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: isLocked ? Colors.white10 : accentColor.withOpacity(0.4), 
+                      color: isClickBlocked ? Colors.white10 : accentColor.withOpacity(0.4), 
                       width: 1.5
                     ),
                     boxShadow: [
-                      if (!isLocked) BoxShadow(color: accentColor.withOpacity(0.2), blurRadius: 15),
+                      if (!isClickBlocked) BoxShadow(color: accentColor.withOpacity(0.2), blurRadius: 15),
                     ],
                   ),
-                  child: Icon(icon, color: isLocked ? Colors.grey : Colors.white, size: 22),
+                  child: Icon(icon, color: isClickBlocked ? Colors.grey : Colors.white, size: 22),
                 ),
-                if (isLocked)
+                
+                // LOCKED / BLOCKED OVERLAY (Rendered whenever interaction is disabled)
+                if (isClickBlocked)
                   Positioned(
                     bottom: 0,
                     right: 0,
@@ -972,51 +1039,51 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
                     ),
                   ),
                 
-                // PREMIUM BOOSTER CHARGE / INVENTORY BADGE
-                if (!isLocked && countNotifier != null)
+                // PREMIUM BOOSTER CHARGE / INVENTORY BADGE (Replicates Lock Icon visual layout)
+                if (!isClickBlocked && countNotifier != null)
                   Positioned(
-                    top: -2,
-                    right: -2,
+                    bottom: 0, // Exact Level 1 lock position
+                    right: 0,  // Exact Level 1 lock position
                     child: ValueListenableBuilder<int>(
                       valueListenable: countNotifier,
                       builder: (context, count, _) {
                         final isZero = count <= 0;
                         return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                          padding: const EdgeInsets.all(4), // Matched lock icon padding
                           decoration: BoxDecoration(
-                            color: isZero ? const Color(0xFF00E5FF) : const Color(0xFF222222),
-                            borderRadius: BorderRadius.circular(10),
+                            color: const Color(0xFF111111), // Exact matching dark background
+                            shape: BoxShape.circle,
                             border: Border.all(
-                              color: isZero ? Colors.white : accentColor.withOpacity(0.8),
-                              width: 1.2,
+                              color: isZero ? const Color(0xFFFFD600) : accentColor.withOpacity(0.8), // Glow
+                              width: 1,
                             ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: (isZero ? const Color(0xFF00E5FF) : accentColor).withOpacity(0.4),
-                                blurRadius: 5,
-                              )
+                            boxShadow: const [
+                              BoxShadow(color: Colors.black87, blurRadius: 5),
                             ]
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (isZero) ...[
-                                const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 10),
-                                const SizedBox(width: 1),
-                                const Text('AD', style: TextStyle(color: Colors.black, fontSize: 8, fontWeight: FontWeight.w900, fontFamily: 'monospace')),
-                              ] else ...[
-                                Text(
-                                  'x$count',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w900,
-                                    fontFamily: 'monospace',
+                          child: isZero
+                              ? const Icon(
+                                  Icons.play_arrow_rounded,
+                                  color: Color(0xFFFFD600), // Pure play-arrow ad icon
+                                  size: 9,
+                                )
+                              : SizedBox(
+                                  width: 9,
+                                  height: 9,
+                                  child: Center(
+                                    child: Text(
+                                      '$count',
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.w900,
+                                        fontFamily: 'monospace',
+                                        height: 1.0,
+                                      ),
+                                    ),
                                   ),
                                 ),
-                              ]
-                            ],
-                          ),
                         );
                       }
                     ),
@@ -1027,7 +1094,7 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
             Text(
               label,
               style: TextStyle(
-                color: isLocked ? Colors.white24 : Colors.white.withOpacity(0.6),
+                color: isClickBlocked ? Colors.white24 : Colors.white.withOpacity(0.6),
                 fontSize: 9,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.5,
@@ -1228,7 +1295,7 @@ class _MainMenuState extends State<MainMenu>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'CURRENT SECTOR',
+                        LangService.t('main_current_sector'),
                         style: TextStyle(
                           color: const Color(0xFFFFD600).withOpacity(0.6),
                           fontSize: 9,
@@ -1930,7 +1997,7 @@ class _ModernPlayButton extends StatelessWidget {
                     ),
                     const SizedBox(width: 15),
                     Text(
-                      'START SECTOR ${level.toString().padLeft(2, '0')}',
+                      '${LangService.t('main_play')} ${level.toString().padLeft(2, '0')}',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 16,
@@ -2091,6 +2158,9 @@ class AdConfirmationOverlay extends StatelessWidget {
                             onPressed: () {
                               game.overlays.remove('AdConfirmation');
                               game.overlays.add('Loading');
+                              
+                              // PREVENT EXPLOITS: Freeze the entire physics & timer engine while watching!
+                              game.paused = true;
 
                               AdService().showRewardedAd(
                                 onAdLoaded: () {
@@ -2115,6 +2185,11 @@ class AdConfirmationOverlay extends StatelessWidget {
                                 },
                                 onAdFailed: () {
                                   game.overlays.remove('Loading');
+                                  game.paused = false; // Unpause engine if request errors!
+                                },
+                                onAdDismissed: () {
+                                  // CRITICAL: Re-activate the engine no matter what once ad closes!
+                                  game.paused = false;
                                 },
                               );
                             },
@@ -2215,6 +2290,15 @@ class SettingsMenu extends StatefulWidget {
 class _SettingsMenuState extends State<SettingsMenu> {
   bool _soundEnabled = true;
 
+  Future<void> _launchURL(String urlString) async {
+    final Uri url = Uri.parse(urlString);
+    try {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      debugPrint('Could not launch $urlString: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Stack(
@@ -2270,9 +2354,9 @@ class _SettingsMenuState extends State<SettingsMenu> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          'SYSTEM CONFIG',
-                          style: TextStyle(
+                        Text(
+                          LangService.t('sett_title'),
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 18,
                             fontWeight: FontWeight.w900,
@@ -2289,18 +2373,28 @@ class _SettingsMenuState extends State<SettingsMenu> {
                     const Divider(color: Colors.white10, height: 1),
                     const SizedBox(height: 24),
 
-                    // SETTINGS CATEGORY 1: SOUND
-                    _buildSettingsHeader('MODULE CONTROLS'),
+                    // SETTINGS CATEGORY 1: SOUND & LOCALIZATION
+                    _buildSettingsHeader(LangService.t('sett_module_controls')),
                     const SizedBox(height: 8),
                     _buildToggleItem(
                       icon: Icons.volume_up_rounded,
-                      title: 'SYSTEM AUDIO',
-                      subtitle: 'Music & VFX output',
+                      title: LangService.t('sett_audio_title'),
+                      subtitle: LangService.t('sett_audio_subtitle'),
                       value: _soundEnabled,
                       onChanged: (val) {
                         setState(() => _soundEnabled = val);
                         // Triggers background routing loop logic
                         widget.game.audio.playBoosterClick(); 
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    // NEW: PREMIUM GLOBAL LANGUAGE SELECTOR
+                    _buildNavTile(
+                      icon: Icons.language_rounded,
+                      title: '${LangService.t('sett_language')}: ${LangService.t('sett_lang_display').toUpperCase()}',
+                      onTap: () {
+                        widget.game.audio.playBoosterClick();
+                        _showLanguageSelector(context);
                       },
                     ),
 
@@ -2309,26 +2403,29 @@ class _SettingsMenuState extends State<SettingsMenu> {
                     const SizedBox(height: 24),
 
                     // SETTINGS CATEGORY 2: LEGAL & INFO
-                    _buildSettingsHeader('DOCUMENTATION'),
+                    _buildSettingsHeader(LangService.t('sett_documentation')),
                     const SizedBox(height: 8),
                     _buildNavTile(
                       icon: Icons.privacy_tip_outlined,
-                      title: 'PRIVACY POLICY',
+                      title: LangService.t('sett_privacy'),
+                      onTap: () => _launchURL('https://eamonstudio.com/boltforge/privacy-policy'),
                     ),
                     _buildNavTile(
                       icon: Icons.article_outlined,
-                      title: 'TERMS OF SERVICE',
+                      title: LangService.t('sett_terms'),
+                      onTap: () => _launchURL('https://eamonstudio.com/boltforge/terms-of-service'),
                     ),
                     _buildNavTile(
                       icon: Icons.info_outline_rounded,
-                      title: 'ABOUT ENGINE',
+                      title: LangService.t('sett_about'),
+                      onTap: () => _launchURL('https://eamonstudio.com/boltforge'),
                     ),
 
                     const SizedBox(height: 32),
                     
                     // FOOTER TELEMETRY
                     Text(
-                      'SECURE VERSION: 1.0.5-BETA',
+                      '${LangService.t('sett_version')}: 1.0.5-BETA',
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.2),
                         fontSize: 9,
@@ -2344,6 +2441,119 @@ class _SettingsMenuState extends State<SettingsMenu> {
           ),
         ),
       ],
+    );
+  }
+
+  void _showLanguageSelector(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withOpacity(0.7),
+      isScrollControlled: true,
+      builder: (ctx) {
+        return BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF1A1A1A), Color(0xFF0D0D0D)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+              border: Border.all(
+                color: const Color(0xFFFF9800).withOpacity(0.3),
+                width: 1.5,
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Decorative industrial grab bar
+                Container(
+                  width: 50,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF9800).withOpacity(0.4),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  LangService.t('sett_language'),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontFamily: 'Courier',
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 2.0,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                // Future-Proof Scalable List
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    physics: const BouncingScrollPhysics(),
+                    children: LangService.supportedLocales.entries.map((entry) {
+                      final bool isSelected = LangService().currentLang == entry.key;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12.0),
+                        child: GestureDetector(
+                          onTap: () async {
+                            widget.game.audio.playBoosterClick();
+                            await LangService().setLanguage(entry.key);
+                            Navigator.pop(ctx); // Dismiss sheet safely
+                            setState(() {}); // Force Settings dialog to redraw text fields
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                            decoration: BoxDecoration(
+                              color: isSelected 
+                                ? const Color(0xFFFF9800).withOpacity(0.15) 
+                                : Colors.white.withOpacity(0.03),
+                              borderRadius: BorderRadius.circular(15),
+                              border: Border.all(
+                                color: isSelected 
+                                  ? const Color(0xFFFF9800).withOpacity(0.8) 
+                                  : Colors.white.withOpacity(0.1),
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  entry.value,
+                                  style: TextStyle(
+                                    color: isSelected ? Colors.white : Colors.white70,
+                                    fontFamily: 'Courier',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 1.0,
+                                  ),
+                                ),
+                                if (isSelected)
+                                  const Icon(
+                                    Icons.verified_rounded,
+                                    color: Color(0xFFFF9800),
+                                    size: 20,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -2408,11 +2618,15 @@ class _SettingsMenuState extends State<SettingsMenu> {
     );
   }
 
-  Widget _buildNavTile({required IconData icon, required String title}) {
+  Widget _buildNavTile({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () {}, // Setup external URLs here in the future
+        onTap: onTap,
         borderRadius: BorderRadius.circular(8),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 8.0),
@@ -2511,9 +2725,9 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
 
     switch (step) {
       case TutorialStep.welcome:
-        title = "SISTEM DIAKTIFKAN";
-        content = "Selamat datang, Operator. Misi utama Anda adalah menjatuhkan seluruh plat besi dengan melepaskan baut yang menahannya. Mari kita mulai pelatihannya!";
-        buttonText = "MULAI PELATIHAN";
+        title = LangService.t('tuto_welcome_t');
+        content = LangService.t('tuto_welcome_c');
+        buttonText = LangService.t('tuto_continue');
         onButtonPressed = () {
           widget.game.tutorialStepNotifier.value = TutorialStep.explainTimer;
         };
@@ -2521,9 +2735,9 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
         break;
       
       case TutorialStep.explainTimer:
-        title = "PROTOKOL ENERGI";
-        content = "Perhatikan waktu! Di pojok bawah layar terdapat indikator batas waktu penyelesaian. Pastikan Anda menyelesaikan puzzle sebelum energi ini habis!";
-        buttonText = "SAYA MENGERTI";
+        title = LangService.t('tuto_timer_t');
+        content = LangService.t('tuto_timer_c');
+        buttonText = LangService.t('tuto_continue');
         onButtonPressed = () {
           widget.game.tutorialStepNotifier.value = TutorialStep.selectLeftBolt;
         };
@@ -2544,61 +2758,85 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
         break;
 
       case TutorialStep.selectLeftBolt:
-        title = "LANGKAH 1: PILIH BAUT";
-        content = "Mari kita buka platnya. Ketuk baut paling kiri (ditunjuk di bawah) untuk melonggarkan ikatannya!";
+        title = LangService.t('tuto_sel_left_t');
+        content = LangService.t('tuto_sel_left_c');
         pointerPosition = _getWorldToScreen(Vector2(-2.0, 18.0));
         showPointer = true;
         break;
 
       case TutorialStep.moveLeftBolt:
-        title = "LANGKAH 2: PINDAHKAN BAUT";
-        content = "Kerja bagus! Baut telah terangkat. Sekarang ketuk lubang kosong pertama di bagian bawah untuk menempatkannya.";
+        title = LangService.t('tuto_mov_left_t');
+        content = LangService.t('tuto_mov_left_c');
         pointerPosition = _getWorldToScreen(Vector2(-1.0, 21.5));
         showPointer = true;
         break;
 
       case TutorialStep.selectRightBolt:
-        title = "BAUT KEDUA";
-        content = "Satu baut berhasil dipindahkan. Sekarang, ketuk baut paling kanan untuk melepaskan ikatan kedua!";
+        title = LangService.t('tuto_sel_right_t');
+        content = LangService.t('tuto_sel_right_c');
         pointerPosition = _getWorldToScreen(Vector2(2.0, 18.0));
         showPointer = true;
         break;
 
       case TutorialStep.moveRightBolt:
-        title = "PINDAHKAN KE BAWAH";
-        content = "Pindahkan baut kanan ini ke lubang kosong kedua yang berada di bawah.";
+        title = LangService.t('tuto_mov_right_t');
+        content = LangService.t('tuto_mov_right_c');
         pointerPosition = _getWorldToScreen(Vector2(1.0, 21.5));
         showPointer = true;
         break;
 
       case TutorialStep.explainSwing:
-        title = "EFEK GRAVITASI";
-        content = "Perhatikan! Karena kini plat hanya disangga oleh SATU baut di tengah, plat berayun jatuh ke bawah karena gravitasi. Lubang bagian atas kini telah kosong!";
-        buttonText = "LANJUTKAN PROSES";
+        title = LangService.t('tuto_swing_t');
+        content = LangService.t('tuto_swing_c');
+        buttonText = LangService.t('tuto_continue');
         onButtonPressed = () {
           widget.game.tutorialStepNotifier.value = TutorialStep.selectCenterBolt;
         };
         break;
 
       case TutorialStep.selectCenterBolt:
-        title = "KUNCI TERAKHIR";
-        content = "Ini langkah krusial! Ketuk baut tengah yang menahan sisa beban dari plat besi tersebut.";
+        title = LangService.t('tuto_sel_cent_t');
+        content = LangService.t('tuto_sel_cent_c');
         pointerPosition = _getWorldToScreen(Vector2(0.0, 18.0));
         showPointer = true;
         break;
 
       case TutorialStep.moveCenterBolt:
-        title = "JATUHKAN PLAT!";
-        content = "Hebat! Pindahkan baut terakhir ini ke lubang atas yang sudah kosong untuk melepaskan plat sepenuhnya!";
+        title = LangService.t('tuto_mov_cent_t');
+        content = LangService.t('tuto_mov_cent_c');
         // Point to the left upper vacated hole
         pointerPosition = _getWorldToScreen(Vector2(-2.0, 18.0));
         showPointer = true;
         break;
 
+      case TutorialStep.explainRust:
+        title = LangService.t('tuto_rust_t');
+        content = LangService.t('tuto_rust_c');
+        pointerPosition = _getWorldToScreen(Vector2(-2.0, 20.0)); // Point straight to top-left rusty bolt
+        showPointer = true;
+        alignment = const Alignment(0, 0.5); // Position box BEAUTIFULLY near bottom!
+        break;
+
+      case TutorialStep.selectTutorialRustBolt:
+        title = LangService.t('tuto_free_t');
+        content = LangService.t('tuto_free_c');
+        pointerPosition = _getWorldToScreen(Vector2(-2.0, 20.0)); // Point to target cleared bolt
+        showPointer = true;
+        alignment = const Alignment(0, 0.5);
+        break;
+
+      case TutorialStep.moveTutorialRustBolt:
+        title = LangService.t('tuto_move_t');
+        content = LangService.t('tuto_move_c');
+        pointerPosition = _getWorldToScreen(Vector2(-2.0, 18.0)); // Point to target hole
+        showPointer = true;
+        alignment = const Alignment(0, 0.5);
+        break;
+
       case TutorialStep.introBoosters:
-        title = "MISI TINGKAT TINGGI";
-        content = "Selamat datang di Level 2. Di level ini, musuh Anda adalah KARAT! Seluruh baut terinfeksi korosi tebal sehingga mustahil dibuka langsung. Mari gunakan Booster!";
-        buttonText = "PELAJARI BADAI STORM";
+        title = LangService.t('tuto_intro_t');
+        content = LangService.t('tuto_intro_c');
+        buttonText = LangService.t('tuto_intro_b');
         onButtonPressed = () {
           widget.game.tutorialStepNotifier.value = TutorialStep.tryStorm;
         };
@@ -2606,8 +2844,8 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
         break;
 
       case TutorialStep.tryStorm:
-        title = "MODUL 1: STORM";
-        content = "Ketuk modul STORM (ditunjuk di bawah) untuk melepaskan badai petir masif yang membersihkan seluruh karat secara instan!";
+        title = LangService.t('tuto_storm_t');
+        content = LangService.t('tuto_storm_c');
         {
           final screenHeight = MediaQuery.of(context).size.height;
           final bottomPadding = MediaQuery.of(context).padding.bottom;
@@ -2619,9 +2857,9 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
         break;
 
       case TutorialStep.explainSmash:
-        title = "KARAT DIHANCURKAN!";
-        content = "Dahsyat! Modul STORM sukses membersihkan semua karat. Kini semua baut bisa dipindahkan. Selanjutnya, mari pelajari modul penghancuran taktis!";
-        buttonText = "PELAJARI MODUL SMASH";
+        title = LangService.t('tuto_smash_t');
+        content = LangService.t('tuto_smash_c');
+        buttonText = LangService.t('tuto_smash_b');
         onButtonPressed = () {
           widget.game.tutorialStepNotifier.value = TutorialStep.trySmash;
         };
@@ -2629,8 +2867,8 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
         break;
 
       case TutorialStep.trySmash:
-        title = "MODUL 2: SMASH";
-        content = "Ketuk modul SMASH untuk meledakkan satu keping plat besi secara acak dari arena, membuka blokade berat secara instan!";
+        title = LangService.t('tuto_smash_t');
+        content = LangService.t('tuto_smash_try_c');
         {
           final screenHeight = MediaQuery.of(context).size.height;
           final bottomPadding = MediaQuery.of(context).padding.bottom;
@@ -2642,9 +2880,9 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
         break;
 
       case TutorialStep.explainChronos:
-        title = "TARGET DIHANCURKAN";
-        content = "Luar biasa! Modul SMASH sukses mereduksi plat besi menjadi debu. Terakhir, modul pamungkas untuk mengendalikan aliran waktu.";
-        buttonText = "PELAJARI CHRONOS";
+        title = LangService.t('tuto_chronos_t');
+        content = LangService.t('tuto_chronos_c');
+        buttonText = LangService.t('tuto_chronos_b');
         onButtonPressed = () {
           widget.game.tutorialStepNotifier.value = TutorialStep.tryChronos;
         };
@@ -2652,8 +2890,8 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
         break;
 
       case TutorialStep.tryChronos:
-        title = "MODUL 3: CHRONOS";
-        content = "Terakhir! Ketuk modul CHRONOS untuk membekukan jalannya waktu secara total agar Anda bisa berpikir jernih saat kritis!";
+        title = LangService.t('tuto_chronos_t');
+        content = LangService.t('tuto_chronos_try_c');
         {
           final screenHeight = MediaQuery.of(context).size.height;
           final bottomPadding = MediaQuery.of(context).padding.bottom;
@@ -2692,13 +2930,25 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
             ),
           ),
 
-        // Premium Dialog Box
-        _TutorialDialog(
-          title: title,
-          content: content,
-          alignment: alignment,
-          buttonText: buttonText,
-          onButtonPressed: onButtonPressed,
+        // Premium Dialog Box (Wrapped to show live, real-time manual tap counters!)
+        ValueListenableBuilder<int>(
+          valueListenable: widget.game.rustTutorialHitsNotifier,
+          builder: (context, hits, _) {
+            String finalContent = content;
+            
+            // DYNAMIC HUD UPDATE: Refresh the text with exact clicks remaining!
+            if (step == TutorialStep.explainRust) {
+              finalContent = "${LangService.t('tuto_rust_c')}\n\n🎯 **${LangService.t('tuto_rust_hits')}: $hits / 6**";
+            }
+            
+            return _TutorialDialog(
+              title: title,
+              content: finalContent,
+              alignment: alignment,
+              buttonText: buttonText,
+              onButtonPressed: onButtonPressed,
+            );
+          }
         ),
       ],
     );
