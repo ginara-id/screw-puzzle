@@ -178,6 +178,26 @@ class LevelManager {
             plate.addHole(worldPos);
           }
         }
+        
+        // 5. Trigger Tutorial for Level 1 & Level 2
+        if (levelNumber == 1) {
+          game.tutorialStepNotifier.value = TutorialStep.welcome;
+          Future.delayed(const Duration(milliseconds: 1200), () {
+            if (game.currentLevel == 1 && !game.overlays.isActive('MainMenu')) {
+              game.overlays.add('Tutorial');
+            }
+          });
+        } else if (levelNumber == 2) {
+          game.tutorialStepNotifier.value = TutorialStep.introBoosters;
+          Future.delayed(const Duration(milliseconds: 1200), () {
+            if (game.currentLevel == 2 && !game.overlays.isActive('MainMenu')) {
+              game.overlays.add('Tutorial');
+            }
+          });
+        } else {
+          game.tutorialStepNotifier.value = null;
+          game.overlays.remove('Tutorial');
+        }
       } catch (e) {
         print('CRITICAL ERROR LOADING LEVEL: $e');
         // Still allow the transition to finish so doors don't stay closed

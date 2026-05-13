@@ -3,23 +3,28 @@
   "bolts": [
     {
       "x": -2.0,
-      "y": 20.0
+      "y": 20.0,
+      "isRusty": true
     },
     {
       "x": 2.0,
-      "y": 20.0
+      "y": 20.0,
+      "isRusty": true
     },
     {
       "x": 0.0,
-      "y": 18.0
+      "y": 18.0,
+      "isRusty": true
     },
     {
       "x": 0.0,
-      "y": 22.0
+      "y": 22.0,
+      "isRusty": true
     },
     {
       "x": 0.0,
-      "y": 20.0
+      "y": 20.0,
+      "isRusty": true
     }
   ],
   "holes": [

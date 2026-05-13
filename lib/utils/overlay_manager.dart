@@ -417,6 +417,38 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
         return SizedBox.expand(
           child: Stack(
             children: [
+              // 1. CYBER FROST TIME FREEZE VIGNETTE (Cinematic Ice Overlay)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: ValueListenableBuilder<bool>(
+                    valueListenable: widget.game.timeFrozenNotifier,
+                    builder: (context, isFrozen, _) {
+                      if (!isFrozen) return const SizedBox.shrink();
+                      
+                      // Pulsing intensity driven by constant animation frame
+                      final pulse = 0.15 + (math.sin(DateTime.now().millisecondsSinceEpoch / 180) * 0.08);
+                      
+                      return Container(
+                        decoration: BoxDecoration(
+                          gradient: RadialGradient(
+                            radius: 1.2,
+                            colors: [
+                              Colors.transparent,
+                              const Color(0xFF00E5FF).withOpacity(pulse.clamp(0.0, 0.35)),
+                            ],
+                            stops: const [0.5, 1.0],
+                          ),
+                          border: Border.all(
+                            color: const Color(0xFF00E5FF).withOpacity(pulse * 0.8),
+                            width: 4.0,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+
               // --- THE ULTIMATE HYPNOTIC ARCADE HUD ---
               // Pure ambient addiction: Fills vision, screams intensity, but ignores all touch!
               Positioned.fill(
@@ -564,6 +596,70 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
                         ],
                       ),
                     ],
+                  ),
+                ),
+              ),
+
+              // --- TOP CENTER: TIME FREEZE ACTIVE COUNTDOWN (Floating Frozen Badge) ---
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 80,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: ValueListenableBuilder<double>(
+                    valueListenable: widget.game.freezeDurationNotifier,
+                    builder: (context, duration, _) {
+                      if (duration <= 0) return const SizedBox.shrink();
+                      
+                      final secsStr = duration.toStringAsFixed(1);
+                      
+                      return TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0.0, end: 1.0),
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOutBack,
+                        builder: (context, scale, child) {
+                          return Transform.scale(scale: scale, child: child);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF00111A).withOpacity(0.85),
+                            borderRadius: BorderRadius.circular(25),
+                            border: Border.all(
+                              color: const Color(0xFF00E5FF).withOpacity(0.8),
+                              width: 2.0,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF00E5FF).withOpacity(0.4),
+                                blurRadius: 15,
+                                spreadRadius: 1,
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.ac_unit_rounded, color: Color(0xFF00E5FF), size: 20),
+                              const SizedBox(width: 12),
+                              Text(
+                                'CHRONOS: ${secsStr}S',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontFamily: 'Courier',
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 2.0,
+                                  shadows: [
+                                    Shadow(color: Color(0xFF00E5FF), blurRadius: 10)
+                                  ]
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ),
@@ -806,38 +902,140 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
   }
 
   Widget _buildBoosterItem(IconData icon, String label, Color accentColor, {VoidCallback? onTap}) {
+    ValueNotifier<int>? countNotifier;
+    if (label == 'STORM') countNotifier = widget.game.stormCountNotifier;
+    if (label == 'SMASH') countNotifier = widget.game.smashCountNotifier;
+    if (label == 'CHRONOS') countNotifier = widget.game.chronosCountNotifier;
+
+    final isLocked = widget.game.currentLevel == 1; // Controls level 1 padlock visualization
+    final step = widget.game.tutorialStepNotifier.value;
+    
+    // Calculate whether interaction is blocked
+    bool isClickBlocked = isLocked;
+    if (step != null) {
+      isClickBlocked = true; // Default block during ANY active tutorial dialogue
+      
+      // SELECTIVELY UNLOCK only the booster corresponding to the active trial step
+      if (label == 'STORM' && step == TutorialStep.tryStorm) isClickBlocked = false;
+      if (label == 'SMASH' && step == TutorialStep.trySmash) isClickBlocked = false;
+      if (label == 'CHRONOS' && step == TutorialStep.tryChronos) isClickBlocked = false;
+    }
+
     return GestureDetector(
-      onTap: () {
+      onTap: isClickBlocked ? null : () {
         widget.game.audio.playBoosterClick();
         if (onTap != null) onTap();
       },
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.4),
-              shape: BoxShape.circle,
-              border: Border.all(color: accentColor.withOpacity(0.4), width: 1.5),
-              boxShadow: [
-                BoxShadow(color: accentColor.withOpacity(0.2), blurRadius: 15),
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 300),
+        opacity: isClickBlocked ? 0.4 : 1.0, // Dims out irrelevant boosters for visual focus!
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: isLocked ? Colors.black.withOpacity(0.6) : Colors.black.withOpacity(0.4),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isLocked ? Colors.white10 : accentColor.withOpacity(0.4), 
+                      width: 1.5
+                    ),
+                    boxShadow: [
+                      if (!isLocked) BoxShadow(color: accentColor.withOpacity(0.2), blurRadius: 15),
+                    ],
+                  ),
+                  child: Icon(icon, color: isLocked ? Colors.grey : Colors.white, size: 22),
+                ),
+                if (isLocked)
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF111111),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: const Color(0xFFFFD600).withOpacity(0.6), width: 1),
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black87, blurRadius: 5),
+                        ]
+                      ),
+                      child: const Icon(
+                        Icons.lock_outline_rounded,
+                        color: Color(0xFFFFD600),
+                        size: 9,
+                      ),
+                    ),
+                  ),
+                
+                // PREMIUM BOOSTER CHARGE / INVENTORY BADGE
+                if (!isLocked && countNotifier != null)
+                  Positioned(
+                    top: -2,
+                    right: -2,
+                    child: ValueListenableBuilder<int>(
+                      valueListenable: countNotifier,
+                      builder: (context, count, _) {
+                        final isZero = count <= 0;
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isZero ? const Color(0xFF00E5FF) : const Color(0xFF222222),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: isZero ? Colors.white : accentColor.withOpacity(0.8),
+                              width: 1.2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: (isZero ? const Color(0xFF00E5FF) : accentColor).withOpacity(0.4),
+                                blurRadius: 5,
+                              )
+                            ]
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (isZero) ...[
+                                const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 10),
+                                const SizedBox(width: 1),
+                                const Text('AD', style: TextStyle(color: Colors.black, fontSize: 8, fontWeight: FontWeight.w900, fontFamily: 'monospace')),
+                              ] else ...[
+                                Text(
+                                  'x$count',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w900,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                              ]
+                            ],
+                          ),
+                        );
+                      }
+                    ),
+                  ),
               ],
             ),
-            child: Icon(icon, color: Colors.white, size: 22),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.6),
-              fontSize: 9,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.5,
-              fontFamily: 'monospace',
-            ),
-          )
-        ],
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                color: isLocked ? Colors.white24 : Colors.white.withOpacity(0.6),
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.5,
+                fontFamily: 'monospace',
+              ),
+            )
+          ],
+        ),
       ),
     );
   }
@@ -1773,6 +1971,20 @@ class AdConfirmationOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isBoosterAd = game.pendingAdBooster != null;
+    
+    final titleText = isBoosterAd ? 'REFILL ${game.pendingAdBooster}' : 'UNLOCK SLOT';
+    final descText = isBoosterAd 
+        ? 'Watch a short video to instantly claim +1 ${game.pendingAdBooster} booster charge.'
+        : 'Watch a short video to gain permanent access to this industrial slot.';
+        
+    IconData displayIcon = Icons.lock_open_rounded;
+    if (isBoosterAd) {
+      if (game.pendingAdBooster == 'STORM') displayIcon = Icons.bolt_rounded;
+      if (game.pendingAdBooster == 'SMASH') displayIcon = Icons.gavel_rounded;
+      if (game.pendingAdBooster == 'CHRONOS') displayIcon = Icons.ac_unit_rounded;
+    }
+
     return Stack(
       children: [
         // Backdrop Blur
@@ -1828,16 +2040,16 @@ class AdConfirmationOverlay extends StatelessWidget {
                         color: const Color(0xFFFFD600).withOpacity(0.1), // Cyan Light
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
-                        Icons.lock_open_rounded,
-                        color: Color(0xFFFFD600), // Pure Cyan
+                      child: Icon(
+                        displayIcon,
+                        color: const Color(0xFFFFD600), // Pure Cyan
                         size: 48,
                       ),
                     ),
                     const SizedBox(height: 20),
-                    const Text(
-                      'UNLOCK SLOT',
-                      style: TextStyle(
+                    Text(
+                      titleText,
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 22,
                         fontWeight: FontWeight.w900,
@@ -1847,7 +2059,7 @@ class AdConfirmationOverlay extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Watch a short video to gain permanent access to this industrial slot.',
+                      descText,
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.6),
@@ -1867,6 +2079,7 @@ class AdConfirmationOverlay extends StatelessWidget {
                             onPressed: () {
                               game.overlays.remove('AdConfirmation');
                               game.pendingAdHole = null;
+                              game.pendingAdBooster = null;
                             },
                           ),
                         ),
@@ -1884,11 +2097,20 @@ class AdConfirmationOverlay extends StatelessWidget {
                                   game.overlays.remove('Loading');
                                 },
                                 onRewardEarned: () {
-                                  if (game.pendingAdHole != null) {
-                                    game.pendingAdHole!.isAdLocked = false;
+                                  if (isBoosterAd) {
+                                    if (game.pendingAdBooster == 'STORM') game.stormCountNotifier.value++;
+                                    if (game.pendingAdBooster == 'SMASH') game.smashCountNotifier.value++;
+                                    if (game.pendingAdBooster == 'CHRONOS') game.chronosCountNotifier.value++;
+                                    game.saveBoosterInventory();
                                     game.audio.playVictory();
-                                    game.updateHoleHighlights();
-                                    game.pendingAdHole = null;
+                                    game.pendingAdBooster = null;
+                                  } else {
+                                    if (game.pendingAdHole != null) {
+                                      game.pendingAdHole!.isAdLocked = false;
+                                      game.audio.playVictory();
+                                      game.updateHoleHighlights();
+                                      game.pendingAdHole = null;
+                                    }
                                   }
                                 },
                                 onAdFailed: () {
@@ -2211,6 +2433,598 @@ class _SettingsMenuState extends State<SettingsMenu> {
               ),
               const Icon(Icons.chevron_right_rounded, color: Colors.white24, size: 20),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// --- PREMIUM INTERACTIVE TUTORIAL SYSTEM ---
+
+class TutorialOverlay extends StatefulWidget {
+  final ScrewPuzzleGame game;
+  const TutorialOverlay({super.key, required this.game});
+
+  @override
+  State<TutorialOverlay> createState() => _TutorialOverlayState();
+}
+
+class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProviderStateMixin {
+  late final AnimationController _animController;
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat();
+
+    widget.game.tutorialStepNotifier.addListener(_updateState);
+  }
+
+  void _updateState() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.game.tutorialStepNotifier.removeListener(_updateState);
+    _animController.dispose();
+    super.dispose();
+  }
+
+  Offset _getWorldToScreen(Vector2 worldPos) {
+    try {
+      final viewfinder = widget.game.camera.viewfinder;
+      final viewport = widget.game.camera.viewport;
+      
+      final offset = worldPos - viewfinder.position;
+      final scaledOffset = offset * viewfinder.zoom;
+      
+      return Offset(
+        (viewport.size.x / 2) + scaledOffset.x,
+        (viewport.size.y / 2) + scaledOffset.y,
+      );
+    } catch (e) {
+      return Offset.zero;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final step = widget.game.tutorialStepNotifier.value;
+    if (step == null) return const SizedBox.shrink();
+
+    String title = "";
+    String content = "";
+    String? buttonText;
+    VoidCallback? onButtonPressed;
+    Alignment alignment = const Alignment(0, 0.35);
+    
+    // Pointer configurations
+    Offset? pointerPosition;
+    bool showPointer = false;
+
+    switch (step) {
+      case TutorialStep.welcome:
+        title = "SISTEM DIAKTIFKAN";
+        content = "Selamat datang, Operator. Misi utama Anda adalah menjatuhkan seluruh plat besi dengan melepaskan baut yang menahannya. Mari kita mulai pelatihannya!";
+        buttonText = "MULAI PELATIHAN";
+        onButtonPressed = () {
+          widget.game.tutorialStepNotifier.value = TutorialStep.explainTimer;
+        };
+        alignment = Alignment.center;
+        break;
+      
+      case TutorialStep.explainTimer:
+        title = "PROTOKOL ENERGI";
+        content = "Perhatikan waktu! Di pojok bawah layar terdapat indikator batas waktu penyelesaian. Pastikan Anda menyelesaikan puzzle sebelum energi ini habis!";
+        buttonText = "SAYA MENGERTI";
+        onButtonPressed = () {
+          widget.game.tutorialStepNotifier.value = TutorialStep.selectLeftBolt;
+        };
+        
+        // Calculate precise dynamic coordinates of the bottom right timer
+        final screenWidth = MediaQuery.of(context).size.width;
+        final screenHeight = MediaQuery.of(context).size.height;
+        final bottomPadding = MediaQuery.of(context).padding.bottom;
+        
+        // Center perfectly over the timer digits in the bottom dock
+        final adHeight = widget.game.hasActiveBannerAd ? 50.0 : 0.0;
+        final timerX = screenWidth - 85;
+        final timerY = screenHeight - (65 + bottomPadding + adHeight);
+        
+        pointerPosition = Offset(timerX, timerY);
+        showPointer = true;
+        alignment = const Alignment(0, -0.1); // Raised up so it doesn't overlap with the pointer and timer
+        break;
+
+      case TutorialStep.selectLeftBolt:
+        title = "LANGKAH 1: PILIH BAUT";
+        content = "Mari kita buka platnya. Ketuk baut paling kiri (ditunjuk di bawah) untuk melonggarkan ikatannya!";
+        pointerPosition = _getWorldToScreen(Vector2(-2.0, 18.0));
+        showPointer = true;
+        break;
+
+      case TutorialStep.moveLeftBolt:
+        title = "LANGKAH 2: PINDAHKAN BAUT";
+        content = "Kerja bagus! Baut telah terangkat. Sekarang ketuk lubang kosong pertama di bagian bawah untuk menempatkannya.";
+        pointerPosition = _getWorldToScreen(Vector2(-1.0, 21.5));
+        showPointer = true;
+        break;
+
+      case TutorialStep.selectRightBolt:
+        title = "BAUT KEDUA";
+        content = "Satu baut berhasil dipindahkan. Sekarang, ketuk baut paling kanan untuk melepaskan ikatan kedua!";
+        pointerPosition = _getWorldToScreen(Vector2(2.0, 18.0));
+        showPointer = true;
+        break;
+
+      case TutorialStep.moveRightBolt:
+        title = "PINDAHKAN KE BAWAH";
+        content = "Pindahkan baut kanan ini ke lubang kosong kedua yang berada di bawah.";
+        pointerPosition = _getWorldToScreen(Vector2(1.0, 21.5));
+        showPointer = true;
+        break;
+
+      case TutorialStep.explainSwing:
+        title = "EFEK GRAVITASI";
+        content = "Perhatikan! Karena kini plat hanya disangga oleh SATU baut di tengah, plat berayun jatuh ke bawah karena gravitasi. Lubang bagian atas kini telah kosong!";
+        buttonText = "LANJUTKAN PROSES";
+        onButtonPressed = () {
+          widget.game.tutorialStepNotifier.value = TutorialStep.selectCenterBolt;
+        };
+        break;
+
+      case TutorialStep.selectCenterBolt:
+        title = "KUNCI TERAKHIR";
+        content = "Ini langkah krusial! Ketuk baut tengah yang menahan sisa beban dari plat besi tersebut.";
+        pointerPosition = _getWorldToScreen(Vector2(0.0, 18.0));
+        showPointer = true;
+        break;
+
+      case TutorialStep.moveCenterBolt:
+        title = "JATUHKAN PLAT!";
+        content = "Hebat! Pindahkan baut terakhir ini ke lubang atas yang sudah kosong untuk melepaskan plat sepenuhnya!";
+        // Point to the left upper vacated hole
+        pointerPosition = _getWorldToScreen(Vector2(-2.0, 18.0));
+        showPointer = true;
+        break;
+
+      case TutorialStep.introBoosters:
+        title = "MISI TINGKAT TINGGI";
+        content = "Selamat datang di Level 2. Di level ini, musuh Anda adalah KARAT! Seluruh baut terinfeksi korosi tebal sehingga mustahil dibuka langsung. Mari gunakan Booster!";
+        buttonText = "PELAJARI BADAI STORM";
+        onButtonPressed = () {
+          widget.game.tutorialStepNotifier.value = TutorialStep.tryStorm;
+        };
+        alignment = Alignment.center;
+        break;
+
+      case TutorialStep.tryStorm:
+        title = "MODUL 1: STORM";
+        content = "Ketuk modul STORM (ditunjuk di bawah) untuk melepaskan badai petir masif yang membersihkan seluruh karat secara instan!";
+        {
+          final screenHeight = MediaQuery.of(context).size.height;
+          final bottomPadding = MediaQuery.of(context).padding.bottom;
+          final adHeight = widget.game.hasActiveBannerAd ? 50.0 : 0.0;
+          pointerPosition = Offset(207, screenHeight - (70 + adHeight + bottomPadding));
+          showPointer = true;
+          alignment = const Alignment(0, -0.15);
+        }
+        break;
+
+      case TutorialStep.explainSmash:
+        title = "KARAT DIHANCURKAN!";
+        content = "Dahsyat! Modul STORM sukses membersihkan semua karat. Kini semua baut bisa dipindahkan. Selanjutnya, mari pelajari modul penghancuran taktis!";
+        buttonText = "PELAJARI MODUL SMASH";
+        onButtonPressed = () {
+          widget.game.tutorialStepNotifier.value = TutorialStep.trySmash;
+        };
+        alignment = Alignment.center;
+        break;
+
+      case TutorialStep.trySmash:
+        title = "MODUL 2: SMASH";
+        content = "Ketuk modul SMASH untuk meledakkan satu keping plat besi secara acak dari arena, membuka blokade berat secara instan!";
+        {
+          final screenHeight = MediaQuery.of(context).size.height;
+          final bottomPadding = MediaQuery.of(context).padding.bottom;
+          final adHeight = widget.game.hasActiveBannerAd ? 50.0 : 0.0;
+          pointerPosition = Offset(137, screenHeight - (70 + adHeight + bottomPadding));
+          showPointer = true;
+          alignment = const Alignment(0, -0.15);
+        }
+        break;
+
+      case TutorialStep.explainChronos:
+        title = "TARGET DIHANCURKAN";
+        content = "Luar biasa! Modul SMASH sukses mereduksi plat besi menjadi debu. Terakhir, modul pamungkas untuk mengendalikan aliran waktu.";
+        buttonText = "PELAJARI CHRONOS";
+        onButtonPressed = () {
+          widget.game.tutorialStepNotifier.value = TutorialStep.tryChronos;
+        };
+        alignment = Alignment.center;
+        break;
+
+      case TutorialStep.tryChronos:
+        title = "MODUL 3: CHRONOS";
+        content = "Terakhir! Ketuk modul CHRONOS untuk membekukan jalannya waktu secara total agar Anda bisa berpikir jernih saat kritis!";
+        {
+          final screenHeight = MediaQuery.of(context).size.height;
+          final bottomPadding = MediaQuery.of(context).padding.bottom;
+          final adHeight = widget.game.hasActiveBannerAd ? 50.0 : 0.0;
+          pointerPosition = Offset(67, screenHeight - (70 + adHeight + bottomPadding));
+          showPointer = true;
+          alignment = const Alignment(0, -0.15);
+        }
+        break;
+    }
+
+    return Stack(
+      children: [
+        // Full screen backdrop blur (ONLY for non-interactive welcome/explanation steps)
+        if (step == TutorialStep.welcome || 
+            step == TutorialStep.introBoosters ||
+            step == TutorialStep.explainSmash ||
+            step == TutorialStep.explainChronos)
+          Positioned.fill(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+              child: Container(color: Colors.black.withOpacity(0.6)),
+            ),
+          ),
+
+        // Pulsing pointing element on top of active bolt/hole/booster
+        if (showPointer && pointerPosition != null && pointerPosition != Offset.zero)
+          IgnorePointer(
+            child: _InteractivePointer(
+              position: pointerPosition,
+              controller: _animController,
+              isTimerArrow: step == TutorialStep.explainTimer || 
+                            step == TutorialStep.tryStorm ||
+                            step == TutorialStep.trySmash ||
+                            step == TutorialStep.tryChronos,
+            ),
+          ),
+
+        // Premium Dialog Box
+        _TutorialDialog(
+          title: title,
+          content: content,
+          alignment: alignment,
+          buttonText: buttonText,
+          onButtonPressed: onButtonPressed,
+        ),
+      ],
+    );
+  }
+}
+
+class _InteractivePointer extends StatelessWidget {
+  final Offset position;
+  final AnimationController controller;
+  final bool isTimerArrow;
+
+  const _InteractivePointer({
+    required this.position,
+    required this.controller,
+    required this.isTimerArrow,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Animate pulsing rings and bouncing arrows
+    return Stack(
+      children: [
+        // 1. Target Pulsing Ring (Centered on element)
+        Positioned(
+          left: position.dx - 40,
+          top: position.dy - 40,
+          child: IgnorePointer(
+            child: AnimatedBuilder(
+              animation: controller,
+              builder: (context, child) {
+                final value = controller.value;
+                return Container(
+                  width: 80,
+                  height: 80,
+                  alignment: Alignment.center,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Container(
+                        width: 40 + (value * 30),
+                        height: 40 + (value * 30),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: const Color(0xFFFFD600).withOpacity((1.0 - value).clamp(0.0, 1.0)),
+                            width: 2.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFFFD600).withOpacity((0.5 * (1.0 - value)).clamp(0.0, 1.0)),
+                              blurRadius: 8,
+                              spreadRadius: 1,
+                            )
+                          ]
+                        ),
+                      ),
+                      Container(
+                        width: 15,
+                        height: 15,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFD600).withOpacity(0.4),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+
+        // 2. Floating bouncing pointer arrow (Always stays above or at the side)
+        Positioned(
+          left: position.dx - 30,
+          top: isTimerArrow ? position.dy - 100 : position.dy - 110,
+          child: IgnorePointer(
+            child: AnimatedBuilder(
+              animation: controller,
+              builder: (context, child) {
+                // Bounce calculation
+                final sinValue = math.sin(controller.value * math.pi * 2);
+                final bounceOffset = sinValue * 12.0;
+
+                return Transform.translate(
+                  offset: Offset(0, bounceOffset),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1A1A1A),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: const Color(0xFFFFD600), width: 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFFFD600).withOpacity(0.6),
+                              blurRadius: 15,
+                              spreadRadius: 2,
+                            )
+                          ],
+                        ),
+                        child: Icon(
+                          isTimerArrow ? Icons.arrow_downward_rounded : Icons.touch_app_rounded,
+                          color: const Color(0xFFFFD600),
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      // Little glowing triangle pointing down
+                      CustomPaint(
+                        size: const Size(14, 8),
+                        painter: _TrianglePainter(color: const Color(0xFFFFD600)),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TrianglePainter extends CustomPainter {
+  final Color color;
+  _TrianglePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    final path = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width / 2, size.height)
+      ..lineTo(size.width, 0)
+      ..close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _TutorialDialog extends StatelessWidget {
+  final String title;
+  final String content;
+  final Alignment alignment;
+  final String? buttonText;
+  final VoidCallback? onButtonPressed;
+
+  const _TutorialDialog({
+    required this.title,
+    required this.content,
+    required this.alignment,
+    this.buttonText,
+    this.onButtonPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: alignment,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28.0),
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.0, end: 1.0),
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeOutBack,
+          builder: (context, value, child) {
+            return Transform.scale(scale: value, child: child);
+          },
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+              child: Container(
+                padding: const EdgeInsets.all(22),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      const Color(0xFF1E1E1E).withOpacity(0.9),
+                      const Color(0xFF0D0D0D).withOpacity(0.95),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: const Color(0xFFFFD600).withOpacity(0.45),
+                    width: 1.8,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.5),
+                      blurRadius: 25,
+                      spreadRadius: 5,
+                    ),
+                    BoxShadow(
+                      color: const Color(0xFFFFD600).withOpacity(0.08),
+                      blurRadius: 15,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Cybernetic Header Bar
+                    Row(
+                      children: [
+                        // Glowing status dot
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFD600),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFFFD600).withOpacity(0.8),
+                                blurRadius: 6,
+                                spreadRadius: 1,
+                              )
+                            ]
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            title,
+                            style: const TextStyle(
+                              color: Color(0xFFFFD600),
+                              fontSize: 15,
+                              fontWeight: FontWeight.w900,
+                              fontFamily: 'Courier',
+                              letterSpacing: 2.0,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      height: 1,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            const Color(0xFFFFD600).withOpacity(0.6),
+                            Colors.transparent,
+                          ]
+                        )
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Tutorial Text Content
+                    Text(
+                      content,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 13,
+                        height: 1.6,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'monospace',
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+
+                    // Action button for modal steps
+                    if (buttonText != null) ...[
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFFFD600).withOpacity(0.35),
+                                blurRadius: 15,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: ElevatedButton(
+                            onPressed: onButtonPressed,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFFFD600),
+                              foregroundColor: Colors.black,
+                              padding: const EdgeInsets.symmetric(vertical: 18),
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                side: const BorderSide(color: Colors.white30, width: 1),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  buttonText!,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 2.0,
+                                    fontSize: 14,
+                                    fontFamily: 'Courier',
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Icon(Icons.arrow_right_alt_rounded, size: 22),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
       ),

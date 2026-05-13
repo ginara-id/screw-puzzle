@@ -30,6 +30,16 @@ class AdService {
     return 'ca-app-pub-3940256099942544/5224354917';
   }
 
+  String get interstitialAdUnitId {
+    if (kDebugMode) {
+      return Platform.isAndroid
+          ? 'ca-app-pub-3940256099942544/1033173712'
+          : 'ca-app-pub-3940256099942544/4411468910';
+    }
+    // Replace with production IDs
+    return 'ca-app-pub-3940256099942544/1033173712';
+  }
+
   Future<void> init() async {
     if (_isInitialized) return;
     await MobileAds.instance.initialize();
@@ -80,6 +90,32 @@ class AdService {
         onAdFailedToLoad: (error) {
           print('RewardedAd failed to load: $error');
           if (onAdFailed != null) onAdFailed();
+        },
+      ),
+    );
+  }
+
+  void showInterstitialAd({Function()? onAdDismissed}) {
+    InterstitialAd.load(
+      adUnitId: interstitialAdUnitId,
+      request: const AdRequest(),
+      adLoadCallback: InterstitialAdLoadCallback(
+        onAdLoaded: (ad) {
+          ad.fullScreenContentCallback = FullScreenContentCallback(
+            onAdDismissedFullScreenContent: (ad) {
+              ad.dispose();
+              if (onAdDismissed != null) onAdDismissed();
+            },
+            onAdFailedToShowFullScreenContent: (ad, error) {
+              ad.dispose();
+              if (onAdDismissed != null) onAdDismissed();
+            },
+          );
+          ad.show();
+        },
+        onAdFailedToLoad: (LoadAdError error) {
+          print('InterstitialAd failed to load: $error');
+          if (onAdDismissed != null) onAdDismissed();
         },
       ),
     );

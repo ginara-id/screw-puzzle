@@ -74,14 +74,21 @@ class _GameMainScreenState extends State<GameMainScreen> {
                           bottom: _bannerAd != null ? _bannerAd!.size.height.toDouble() : 0),
                       child: GameOverMenu(game: game),
                     ),
-                'HUD': (context, game) => Padding(
-                      padding: EdgeInsets.only(
-                          bottom: _bannerAd != null ? _bannerAd!.size.height.toDouble() : 0),
-                      child: HUDMenu(game: game),
-                    ),
+                'HUD': (context, game) {
+                  game.hasActiveBannerAd = (_bannerAd != null);
+                  return Padding(
+                    padding: EdgeInsets.only(
+                        bottom: _bannerAd != null ? _bannerAd!.size.height.toDouble() : 0),
+                    child: HUDMenu(game: game),
+                  );
+                },
                 'AdConfirmation': (context, game) => AdConfirmationOverlay(game: game),
                 'Loading': (context, game) => LoadingOverlay(game: game),
                 'SettingsMenu': (context, game) => SettingsMenu(game: game),
+                'Tutorial': (context, game) {
+                  game.hasActiveBannerAd = (_bannerAd != null);
+                  return TutorialOverlay(game: game);
+                },
               },
             ),
           ),
