@@ -192,23 +192,35 @@ class ScrewPuzzleGame extends Forge2DGame {
   /// Prioritizes user retention by introducing levels 1-3 ad-free gating, 
   /// and frequency limiting ads to only 1 every 2 completed games.
   void triggerInterstitialWithPacing(VoidCallback onComplete) {
-    // --- PENTING UNTUK TESTING ---
-    // Saat ini saya nonaktifkan gate level dan pacing agar Anda bisa langsung 
-    // melihat iklan bekerja di Level mana pun (Level 2, dsb.) di setiap kali game selesai!
+    print('\n=== 🛡️ [AD_PACS] MEMULAI EVALUASI IKLAN INTERSTITIAL ===');
+    print('📄 Level Saat Ini: $currentLevel');
     
-    // 🛑 SAAT RILIS: Ubah 'currentLevel < 1' menjadi 'currentLevel <= 3' agar level 1-3 bebas iklan.
+    // GATE 1: Level Restriction Check
     if (currentLevel < 1) {
+      print('⛔ [AD_PACS] DILEWATI: Level $currentLevel masih di bawah batas aman bebas iklan.');
+      print('====================================================\n');
       onComplete();
       return;
     }
 
     _gamesSinceLastInterstitial++;
+    print('📈 Hitung Game Sejak Iklan Terakhir: $_gamesSinceLastInterstitial / 1 (Target)');
 
-    // 🛑 SAAT RILIS: Ubah '>= 1' menjadi '>= 2' agar iklan hanya muncul setiap 2 kali game selesai.
+    // GATE 2: Frequency Cap Check
     if (_gamesSinceLastInterstitial >= 1) {
+      print('🎬 [AD_PACS] DISETUJUI: Memuat & Menampilkan Iklan Layar Penuh...');
       _gamesSinceLastInterstitial = 0;
-      AdService().showInterstitialAd(onAdDismissed: onComplete);
+      
+      AdService().showInterstitialAd(
+        onAdDismissed: () {
+          print('✅ [AD_PACS] SELESAI: Iklan ditutup. Membuka Menu Game Akhir.');
+          print('====================================================\n');
+          onComplete();
+        },
+      );
     } else {
+      print('⏳ [AD_PACS] DILEWATI: Jumlah game belum mencapai kuota pacing.');
+      print('====================================================\n');
       onComplete();
     }
   }

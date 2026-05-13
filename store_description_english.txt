@@ -1,0 +1,44 @@
+--- GOOGLE PLAY STORE METADATA (ENGLISH) ---
+
+[1] APP TITLE (Max 30 Characters)
+---------------------------------
+Screw Master: Physics Puzzle
+
+Alternative Title Options:
+- Screw Puzzle: Mechanical Spin
+- Bolt & Plate: Physics Game
+
+
+[2] SHORT DESCRIPTION (Max 80 Characters)
+-----------------------------------------
+Unscrew bolts, free metal plates, and master ultimate physics-based puzzles!
+
+
+[3] LONG DESCRIPTION (Max 4000 Characters)
+------------------------------------------
+Unlock your mechanical genius and solve the ultimate physics-based puzzle challenge!
+
+Welcome to the world of industrial mechanics, where strategy meets realism. In this immersive puzzle game, your objective is straightforward but highly challenging: remove metal bolts strategically to release heavy steel plates, clear the board, and master each level.
+
+Every movement matters. A single wrong unscrew can jam the plates or trap your bolts! Think ahead, plan your sequence, and watch the plates fall with satisfying realistic physics.
+
+🔧 ADDICTIVE GAMEPLAY MECHANICS
+Immerse yourself in an authentic workshop atmosphere. Tap to unscrew bolts and place them in available empty holes. Analyze how plates overlap, gravity's pull, and the swinging motion of free-hanging metals to find the perfect solution.
+
+🚀 POWERFUL CYBER BOOSTERS
+Stuck on a highly complex grid? Harness the power of special tools to turn the tide:
+- Storm (Rust Cleanse): Instantly blast away stubborn rust from bolts to make them movable again.
+- Smash (Plate Destroyer): Clear obstacles instantly by shattering a random plate off the board.
+- Chronos (Time Freeze): Put time into absolute stasis to give yourself a tactical advantage and plan your next moves without pressure!
+
+🌟 GAME FEATURES:
+- Realistic 2D Physics Engine: Experience genuine weight distribution, gravity, and collision dynamics as plates drop and swing.
+- Interactive Tutorial: Learn the mechanics instantly through a hands-on, guided trial session.
+- Challenging Levels: Progress from simple warm-ups to brain-bending mechanical masterpieces.
+- Stunning Aesthetic: Sleek industrial design with glowing neon accents, premium metallic textures, and smooth user-friendly interfaces.
+- Strategic Combos: Clear plates quickly to trigger speed multiplier bonuses!
+- Train Your Brain: Enhances logical thinking, spatial awareness, and strategic planning skills.
+
+Whether you are looking for a relaxing brain teaser or an intense mechanical challenge, this game offers an incredibly satisfying puzzle-solving experience. 
+
+Are you ready to unscrew your way to victory? Download now and test your problem-solving limits!
