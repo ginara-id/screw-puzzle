@@ -288,7 +288,7 @@ class GameOverMenu extends StatelessWidget {
                           icon: Icons.refresh_rounded,
                           onPressed: () {
                             game.overlays.remove('GameOverMenu');
-                            game.resetLevel();
+                            game.resetLevel(mode: TransitionMode.openOnly);
                           },
                         ),
                       ],
@@ -2917,19 +2917,6 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
             ),
           ),
 
-        // Pulsing pointing element on top of active bolt/hole/booster
-        if (showPointer && pointerPosition != null && pointerPosition != Offset.zero)
-          IgnorePointer(
-            child: _InteractivePointer(
-              position: pointerPosition,
-              controller: _animController,
-              isTimerArrow: step == TutorialStep.explainTimer || 
-                            step == TutorialStep.tryStorm ||
-                            step == TutorialStep.trySmash ||
-                            step == TutorialStep.tryChronos,
-            ),
-          ),
-
         // Premium Dialog Box (Wrapped to show live, real-time manual tap counters!)
         ValueListenableBuilder<int>(
           valueListenable: widget.game.rustTutorialHitsNotifier,
@@ -2950,6 +2937,19 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
             );
           }
         ),
+
+        // Pulsing pointing element on top of active bolt/hole/booster AND dialog!
+        if (showPointer && pointerPosition != null && pointerPosition != Offset.zero)
+          IgnorePointer(
+            child: _InteractivePointer(
+              position: pointerPosition,
+              controller: _animController,
+              isTimerArrow: step == TutorialStep.explainTimer || 
+                            step == TutorialStep.tryStorm ||
+                            step == TutorialStep.trySmash ||
+                            step == TutorialStep.tryChronos,
+            ),
+          ),
       ],
     );
   }

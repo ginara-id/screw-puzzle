@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:sensors_plus/sensors_plus.dart';
+import 'package:flame_audio/flame_audio.dart';
 import '../main.dart';
 
 enum SplashSequence {
@@ -46,7 +47,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
 
     _loadingController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 4000),
+      duration: const Duration(milliseconds: 13500), // Synced precisely with machine.mp3 duration
     );
 
     // Physical Inertia
@@ -79,8 +80,18 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
       setState(() {
         _currentSequence = SplashSequence.gameIntro;
       });
-      // 3. Start genuine loading progression on Stage 2 entrance
-      _loadingController.forward().then((_) => _navigateToGame());
+      // Fire the heavy machinery startup audio!
+      FlameAudio.play('machine.mp3', volume: 0.85).then((player) {
+        // Run the visual loading bar at its intended cinematic speed (4 seconds)
+        _loadingController.duration = const Duration(milliseconds: 4000);
+        
+        _loadingController.forward().then((_) {
+          // Force stop the machine audio exactly when the loading bar hits 100%
+          // so it doesn't spill over into the main menu!
+          player.stop();
+          if (mounted) _navigateToGame();
+        });
+      });
     });
   }
 

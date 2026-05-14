@@ -303,10 +303,10 @@ class PlateComponent extends BodyComponent<ScrewPuzzleGame>
         final relativeVelocity =
             (body.linearVelocity - other.body.linearVelocity).length;
 
-        // Dropped threshold significantly (12.0 -> 3.0) so small knocks now satisfy the auditory industrial feedback
-        if (relativeVelocity > 3.0) {
-          // Dynamic volume scaling for varied auditory landscape
-          final impactVolume = (relativeVelocity / 20.0).clamp(0.15, 1.0);
+        // Re-tuned for hyper-realistic reactivity: trigger even on very small knocks (0.8)
+        if (relativeVelocity > 0.8) {
+          // Dynamic volume scaling (soft taps = low volume, hard slams = loud volume)
+          final impactVolume = (relativeVelocity / 15.0).clamp(0.05, 1.0);
           gameRef.audio.playPlateCollision(volume: impactVolume);
 
           if (relativeVelocity > 8.0) {

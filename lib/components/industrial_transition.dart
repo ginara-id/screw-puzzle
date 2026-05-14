@@ -42,6 +42,9 @@ class IndustrialTransitionComponent extends PositionComponent with HasGameRef<Sc
     // Hide HUD so transition is on top (overlays are always above components)
     _hadHud = gameRef.overlays.isActive('HUD');
     if (_hadHud) gameRef.overlays.remove('HUD');
+    
+    // Mute BGM so the gate mechanical sounds stand out
+    gameRef.audio.muteBgmForTransition();
 
     final doorWidth = size.x / 2 + 10; // Extra overlap
     final doorHeight = size.y + 20;
@@ -68,6 +71,9 @@ class IndustrialTransitionComponent extends PositionComponent with HasGameRef<Sc
       // unless we are in the Main Menu.
       if (!gameRef.overlays.isActive('MainMenu')) {
         gameRef.overlays.add('HUD');
+        gameRef.audio.playGameBGM();
+      } else {
+        gameRef.audio.playMenuBGM();
       }
       removeFromParent();
     }
@@ -75,6 +81,7 @@ class IndustrialTransitionComponent extends PositionComponent with HasGameRef<Sc
     if (mode == TransitionMode.openOnly) {
       // Just open
       await onHalfway();
+      gameRef.audio.playGateOpen();
       leftDoor.add(MoveEffect.to(Vector2(-doorWidth / 2, doorHeight / 2), EffectController(duration: 0.6, curve: Curves.easeOutCubic)));
       rightDoor.add(MoveEffect.to(Vector2(size.x + doorWidth / 2, doorHeight / 2), EffectController(duration: 0.6, curve: Curves.easeOutCubic)));
       Future.delayed(const Duration(milliseconds: 700), finishTransition);
@@ -82,6 +89,7 @@ class IndustrialTransitionComponent extends PositionComponent with HasGameRef<Sc
     }
 
     // Slam shut
+    gameRef.audio.playGateClose();
     leftDoor.add(MoveEffect.to(Vector2(doorWidth / 2, doorHeight / 2), EffectController(duration: 0.4, curve: Curves.easeInCubic)));
     rightDoor.add(MoveEffect.to(Vector2(size.x - doorWidth / 2, doorHeight / 2), EffectController(duration: 0.4, curve: Curves.easeInCubic)));
 
@@ -104,6 +112,7 @@ class IndustrialTransitionComponent extends PositionComponent with HasGameRef<Sc
       
       // Pause then open
       Future.delayed(const Duration(milliseconds: 600), () {
+        gameRef.audio.playGateOpen();
         leftDoor.add(MoveEffect.to(Vector2(-doorWidth / 2, doorHeight / 2), EffectController(duration: 0.6, curve: Curves.easeOutCubic)));
         rightDoor.add(MoveEffect.to(Vector2(size.x + doorWidth / 2, doorHeight / 2), EffectController(duration: 0.6, curve: Curves.easeOutCubic)));
         Future.delayed(const Duration(milliseconds: 700), finishTransition);

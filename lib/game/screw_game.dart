@@ -257,6 +257,9 @@ class ScrewPuzzleGame extends Forge2DGame {
   int _comboCount = 0;
   static const double comboWindow = 1.0; // Absolute God-Speed (1 second flat)
   
+  // AUDIO TRACKING
+  int _lastTickSecond = -1;
+
   int get comboCount => _comboCount;
   double get lastMoveTime => _lastMoveTime;
   double get comboPercent => (1.0 - (_lastMoveTime / comboWindow)).clamp(0.0, 1.0);
@@ -292,6 +295,17 @@ class ScrewPuzzleGame extends Forge2DGame {
       if (_remainingTime <= 0) {
         _remainingTime = 0;
         _triggerGameOver();
+      }
+
+      // Audio warning tick precisely once per second
+      if (_remainingTime <= 10.0 && _remainingTime > 0) {
+        final currentSecond = _remainingTime.toInt();
+        if (currentSecond != _lastTickSecond) {
+          _lastTickSecond = currentSecond;
+          audio.playTimeWarningTick();
+        }
+      } else {
+        _lastTickSecond = -1;
       }
 
       // Pulse feel when low on time
@@ -375,16 +389,22 @@ class ScrewPuzzleGame extends Forge2DGame {
   void _triggerGameOver() {
     if (_isGameOver || _isVictoryTriggered) return;
     _isGameOver = true;
-    // No more flame-based banners, rely on the Flutter UI overlay
-
+    
     audio.playGameOver();
 
-    // Delay showing the menu a bit to let the banner slam
-    Future.delayed(const Duration(seconds: 2), () {
-      triggerInterstitialWithPacing(() {
-        overlays.add('GameOverMenu');
-      });
-    });
+    // Close the heavy industrial doors, then show the game over menu!
+    camera.viewport.add(
+      IndustrialTransitionComponent(
+        mode: TransitionMode.closeOnly,
+        onHalfway: () async {
+          if (!overlays.isActive('GameOverMenu')) {
+            triggerInterstitialWithPacing(() {
+              overlays.add('GameOverMenu');
+            });
+          }
+        },
+      ),
+    );
   }
 
   // Removed old static showScoreEffect
@@ -505,7 +525,7 @@ class ScrewPuzzleGame extends Forge2DGame {
 
     for (final bolt in rustyBolts) {
       // Quick small lightning impact audio for each
-      audio.playBoltSnap(); // Punchy instant feedback
+      audio.playLightningStrike(); // Dynamic thunder clap
 
       // Identify where the sky is relative to current camera
       final worldPos = bolt.body.position;
@@ -560,7 +580,7 @@ class ScrewPuzzleGame extends Forge2DGame {
     freezeDurationNotifier.value = 10.0;
     timeFrozenNotifier.value = true;
     audio.playBoosterClick();
-    audio.playSfx('powerup.wav', volume: 0.8); // Play powerful sci-fi activation sound!
+    audio.playIceFreeze(); // Use the optimized ice.mp3 memory-safe effect
 
     // TUTORIAL PROGRESSION
     if (tutorialStepNotifier.value == TutorialStep.tryChronos) {
@@ -601,7 +621,7 @@ class ScrewPuzzleGame extends Forge2DGame {
 
     // EXPLOSION EFFECT
     showSmashEffect(target.body.position);
-    audio.playPlateCollision(volume: 1.0);
+    audio.playSmashPlate();
     shakeCamera(intensity: 1.5, duration: 0.5);
 
     // Remove joints first
@@ -686,7 +706,7 @@ class ScrewPuzzleGame extends Forge2DGame {
       bolt.hitsRemaining--;
       bolt.shake(); // Visual jiggle
       createSparks(bolt.body.position, isMetalDust: true); // Brown/Grey dust
-      audio.playBoltTap(); // Mechanical tap feedback
+      audio.playRustTap(); // Gritty rust breaking sound
       
       // DYNAMIC TUTORIAL SINK: Feed current remaining hits directly to the UI overlay!
       if (tutorialStepNotifier.value == TutorialStep.explainRust) {
@@ -712,6 +732,7 @@ class ScrewPuzzleGame extends Forge2DGame {
       // Toggle off -> Drop back to Static
       _activeBolt?.isLifted = false;
       _activeBolt = null;
+      audio.playDropScrew();
 
       // Tutorial Revert
       if (step == TutorialStep.moveLeftBolt) tutorialStepNotifier.value = TutorialStep.selectLeftBolt;
@@ -725,6 +746,7 @@ class ScrewPuzzleGame extends Forge2DGame {
       // Select New
       _activeBolt = bolt;
       _activeBolt?.isLifted = true;
+      audio.playPickScrew();
 
       // Tutorial Advance
       if (step == TutorialStep.selectLeftBolt) tutorialStepNotifier.value = TutorialStep.moveLeftBolt;
@@ -847,7 +869,7 @@ class ScrewPuzzleGame extends Forge2DGame {
         final wasHoldingPlate = _boltJoints[bolt]?.isNotEmpty ?? false;
 
         _releaseBolt(bolt, withNudge: false);
-        audio.playBoltSnap();
+        audio.playDropScrew();
         createSparks(hole.position);
 
         final targetPos = hole.position;
