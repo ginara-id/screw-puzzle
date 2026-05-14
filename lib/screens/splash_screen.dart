@@ -50,16 +50,15 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
       duration: const Duration(milliseconds: 13500), // Synced precisely with machine.mp3 duration
     );
 
-    // Physical Inertia
+    // Physical Inertia - Store data but don't call setState here
     _gyroScopeSubscription = gyroscopeEventStream().listen((GyroscopeEvent event) {
       if (!mounted) return;
-      setState(() {
-        _parallaxX = (_parallaxX + (event.y * 1.3)).clamp(-25.0, 25.0);
-        _parallaxY = (_parallaxY + (event.x * 1.3)).clamp(-25.0, 25.0);
-      });
+      _parallaxX = (_parallaxX + (event.y * 1.3)).clamp(-25.0, 25.0);
+      _parallaxY = (_parallaxY + (event.x * 1.3)).clamp(-25.0, 25.0);
     });
 
-    // Background Particle Sync
+    // Background Particle Sync + Parallax consolidation (60FPS)
+    // This is the SINGLE point of UI update to save CPU/Battery
     Timer.periodic(const Duration(milliseconds: 16), (timer) {
       if (!mounted) {
         timer.cancel();
@@ -69,6 +68,8 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
         for (var s in _sparks) {
           s.update();
         }
+        // Parallax values are updated by the stream, setState here 
+        // will reflect the latest values along with spark positions.
       });
     });
 
@@ -97,13 +98,14 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
 
   void _navigateToGame() {
     if (!mounted) return;
+    
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) => const GameMainScreen(),
-        transitionDuration: const Duration(milliseconds: 1500),
+        transitionDuration: const Duration(milliseconds: 1000),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(
-            opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+            opacity: CurvedAnimation(parent: animation, curve: Curves.easeIn),
             child: child,
           );
         },

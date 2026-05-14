@@ -7,7 +7,9 @@ import 'package:screw_puzzle/utils/ad_service.dart';
 import '../game/screw_game.dart';
 import '../components/industrial_transition.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'lang_service.dart';
+import 'firebase_level_service.dart';
 
 class WinMenu extends StatelessWidget {
   final ScrewPuzzleGame game;
@@ -17,13 +19,8 @@ class WinMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // Backdrop Blur
-        Positioned.fill(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-            child: Container(color: Colors.black.withOpacity(0.5)),
-          ),
-        ),
+        // Efficient Semi-Transparent Overlay (Zero GPU Cost)
+        Positioned.fill(child: Container(color: Colors.black.withOpacity(0.7))),
         Center(
           child: TweenAnimationBuilder<double>(
             tween: Tween(begin: 0.0, end: 1.0),
@@ -204,10 +201,7 @@ class GameOverMenu extends StatelessWidget {
     return Stack(
       children: [
         Positioned.fill(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-            child: Container(color: Colors.redAccent.withOpacity(0.1)),
-          ),
+          child: Container(color: Colors.black.withOpacity(0.75)),
         ),
         Center(
           child: TweenAnimationBuilder<double>(
@@ -394,7 +388,7 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
     setState(() {
       _displayBonus = val;
     });
-    
+
     _bonusController.forward(from: 0);
   }
 
@@ -426,22 +420,31 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
                     valueListenable: widget.game.timeFrozenNotifier,
                     builder: (context, isFrozen, _) {
                       if (!isFrozen) return const SizedBox.shrink();
-                      
+
                       // Pulsing intensity driven by constant animation frame
-                      final pulse = 0.15 + (math.sin(DateTime.now().millisecondsSinceEpoch / 180) * 0.08);
-                      
+                      final pulse =
+                          0.15 +
+                          (math.sin(
+                                DateTime.now().millisecondsSinceEpoch / 180,
+                              ) *
+                              0.08);
+
                       return Container(
                         decoration: BoxDecoration(
                           gradient: RadialGradient(
                             radius: 1.2,
                             colors: [
                               Colors.transparent,
-                              const Color(0xFF00E5FF).withOpacity(pulse.clamp(0.0, 0.35)),
+                              const Color(
+                                0xFF00E5FF,
+                              ).withOpacity(pulse.clamp(0.0, 0.35)),
                             ],
                             stops: const [0.5, 1.0],
                           ),
                           border: Border.all(
-                            color: const Color(0xFF00E5FF).withOpacity(pulse * 0.8),
+                            color: const Color(
+                              0xFF00E5FF,
+                            ).withOpacity(pulse * 0.8),
                             width: 4.0,
                           ),
                         ),
@@ -456,101 +459,131 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
               Positioned.fill(
                 child: IgnorePointer(
                   child: ValueListenableBuilder<double>(
-                            valueListenable: widget.game.comboUpdateNotifier,
-                            builder: (context, percent, _) {
-                              final count = widget.game.comboCount;
-                              if (percent <= 0 || count <= 1) return const SizedBox.shrink();
-                              
-                              final comboColor = count == 1 ? const Color(0xFFFFD600) : 
-                                                 (count == 2 ? const Color(0xFFFF9100) : const Color(0xFF00E5FF));
-                              
-                              // Dynamic breathing intensity linked purely to continuous frame stream
-                              final breath = 0.05 + (math.sin(DateTime.now().millisecondsSinceEpoch / 200) * 0.03);
+                    valueListenable: widget.game.comboUpdateNotifier,
+                    builder: (context, percent, _) {
+                      final count = widget.game.comboCount;
+                      if (percent <= 0 || count <= 1)
+                        return const SizedBox.shrink();
 
-                              return Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  // 1. ATMOSPHERIC SCREEN VIGNETTE (Pulsing edges hypnotize the periphery!)
-                                  AnimatedContainer(
-                                    duration: const Duration(milliseconds: 100),
-                                    decoration: BoxDecoration(
-                                      gradient: RadialGradient(
-                                        radius: 1.3,
-                                        colors: [
-                                          Colors.transparent,
-                                          comboColor.withOpacity(breath.clamp(0.0, 0.3)),
-                                        ],
-                                        stops: const [0.7, 1.0],
-                                      ),
-                                    ),
-                                  ),
+                      final comboColor = count == 1
+                          ? const Color(0xFFFFD600)
+                          : (count == 2
+                                ? const Color(0xFFFF9100)
+                                : const Color(0xFF00E5FF));
 
-                                  // 2. TOP & BOTTOM "CINEMA BAR" ENERGY TUBES (Visual Drain Framework)
-                                  Positioned(
-                                    top: 0, left: 0, right: 0,
-                                    child: FractionallySizedBox(
-                                      alignment: Alignment.center,
-                                      widthFactor: percent.clamp(0.0, 1.0),
-                                      child: Container(
-                                        height: 3,
-                                        decoration: BoxDecoration(
-                                          color: comboColor,
-                                          boxShadow: [BoxShadow(color: comboColor, blurRadius: 10, spreadRadius: 1)],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  Positioned(
-                                    bottom: 0, left: 0, right: 0,
-                                    child: FractionallySizedBox(
-                                      alignment: Alignment.center,
-                                      widthFactor: percent.clamp(0.0, 1.0),
-                                      child: Container(
-                                        height: 3,
-                                        decoration: BoxDecoration(
-                                          color: comboColor,
-                                          boxShadow: [BoxShadow(color: comboColor, blurRadius: 10, spreadRadius: 1)],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
+                      // Dynamic breathing intensity linked purely to continuous frame stream
+                      final breath =
+                          0.05 +
+                          (math.sin(
+                                DateTime.now().millisecondsSinceEpoch / 200,
+                              ) *
+                              0.03);
 
-                                  // 3. GIGANTIC GHOST BACKGROUND MULTIPLIER
-                                  // Rendered in center, very low opacity so it floats BEHIND focus!
-                                  Opacity(
-                                    opacity: 0.08, // Extremely subtle ghost effect
-                                    child: Transform.scale(
-                                      // Reacts to the timer! Shrinks as combo fades!
-                                      scale: 0.8 + (percent * 0.7), 
-                                      child: Text(
-                                        '${count}X',
-                                        style: TextStyle(
-                                          color: comboColor,
-                                          fontSize: 180,
-                                          fontWeight: FontWeight.w900,
-                                          fontFamily: 'Courier',
-                                          letterSpacing: -10,
-                                          fontStyle: FontStyle.italic,
-                                          shadows: [
-                                            Shadow(color: comboColor, blurRadius: 20)
-                                          ]
-                                        ),
-                                      ),
-                                    ),
+                      return Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          // 1. ATMOSPHERIC SCREEN VIGNETTE (Pulsing edges hypnotize the periphery!)
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 100),
+                            decoration: BoxDecoration(
+                              gradient: RadialGradient(
+                                radius: 1.3,
+                                colors: [
+                                  Colors.transparent,
+                                  comboColor.withOpacity(
+                                    breath.clamp(0.0, 0.3),
                                   ),
                                 ],
-                              );
-                            },
+                                stops: const [0.7, 1.0],
+                              ),
+                            ),
                           ),
+
+                          // 2. TOP & BOTTOM "CINEMA BAR" ENERGY TUBES (Visual Drain Framework)
+                          Positioned(
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            child: FractionallySizedBox(
+                              alignment: Alignment.center,
+                              widthFactor: percent.clamp(0.0, 1.0),
+                              child: Container(
+                                height: 3,
+                                decoration: BoxDecoration(
+                                  color: comboColor,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: comboColor,
+                                      blurRadius: 10,
+                                      spreadRadius: 1,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            child: FractionallySizedBox(
+                              alignment: Alignment.center,
+                              widthFactor: percent.clamp(0.0, 1.0),
+                              child: Container(
+                                height: 3,
+                                decoration: BoxDecoration(
+                                  color: comboColor,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: comboColor,
+                                      blurRadius: 10,
+                                      spreadRadius: 1,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          // 3. GIGANTIC GHOST BACKGROUND MULTIPLIER
+                          // Rendered in center, very low opacity so it floats BEHIND focus!
+                          Opacity(
+                            opacity: 0.08, // Extremely subtle ghost effect
+                            child: Transform.scale(
+                              // Reacts to the timer! Shrinks as combo fades!
+                              scale: 0.8 + (percent * 0.7),
+                              child: Text(
+                                '${count}X',
+                                style: TextStyle(
+                                  color: comboColor,
+                                  fontSize: 180,
+                                  fontWeight: FontWeight.w900,
+                                  fontFamily: 'Courier',
+                                  letterSpacing: -10,
+                                  fontStyle: FontStyle.italic,
+                                  shadows: [
+                                    Shadow(color: comboColor, blurRadius: 20),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
                 ),
               ),
-              
+
               // --- TOP LEFT: LEVEL INDICATOR (Floating Glass Pill) ---
               Positioned(
                 top: MediaQuery.of(context).padding.top + 16,
                 left: 16,
                 child: _buildGlassContainer(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 10,
+                  ),
                   borderRadius: BorderRadius.circular(25),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -564,10 +597,10 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFFFFD600).withOpacity(0.8), 
+                              color: const Color(0xFFFFD600).withOpacity(0.8),
                               blurRadius: 10,
                               spreadRadius: 2,
-                            )
+                            ),
                           ],
                         ),
                       ),
@@ -612,9 +645,9 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
                     valueListenable: widget.game.freezeDurationNotifier,
                     builder: (context, duration, _) {
                       if (duration <= 0) return const SizedBox.shrink();
-                      
+
                       final secsStr = duration.toStringAsFixed(1);
-                      
+
                       return TweenAnimationBuilder<double>(
                         tween: Tween(begin: 0.0, end: 1.0),
                         duration: const Duration(milliseconds: 300),
@@ -623,7 +656,10 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
                           return Transform.scale(scale: scale, child: child);
                         },
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 10,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFF00111A).withOpacity(0.85),
                             borderRadius: BorderRadius.circular(25),
@@ -642,7 +678,11 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.ac_unit_rounded, color: Color(0xFF00E5FF), size: 20),
+                              const Icon(
+                                Icons.ac_unit_rounded,
+                                color: Color(0xFF00E5FF),
+                                size: 20,
+                              ),
                               const SizedBox(width: 12),
                               Text(
                                 'CHRONOS: ${secsStr}S',
@@ -653,8 +693,11 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
                                   fontWeight: FontWeight.w900,
                                   letterSpacing: 2.0,
                                   shadows: [
-                                    Shadow(color: Color(0xFF00E5FF), blurRadius: 10)
-                                  ]
+                                    Shadow(
+                                      color: Color(0xFF00E5FF),
+                                      blurRadius: 10,
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
@@ -671,7 +714,10 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
                 top: MediaQuery.of(context).padding.top + 16,
                 right: 16,
                 child: _buildGlassContainer(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 6,
+                  ),
                   borderRadius: BorderRadius.circular(25),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -684,10 +730,10 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
                         },
                       ),
                       Container(
-                        width: 1, 
-                        height: 20, 
-                        color: Colors.white.withOpacity(0.2), 
-                        margin: const EdgeInsets.symmetric(horizontal: 4)
+                        width: 1,
+                        height: 20,
+                        color: Colors.white.withOpacity(0.2),
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
                       ),
                       _buildIconButton(
                         icon: Icons.refresh_rounded,
@@ -704,7 +750,10 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
                 left: 16,
                 right: 16,
                 child: _buildGlassContainer(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 16,
+                  ),
                   borderRadius: BorderRadius.circular(35),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -714,14 +763,29 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                           _buildBoosterItem(Icons.ac_unit_rounded, 'CHRONOS', const Color(0xFF00E5FF), onTap: widget.game.useTimeFreezeBooster),
-                           const SizedBox(width: 16),
-                           _buildBoosterItem(Icons.gavel_rounded, 'SMASH', const Color(0xFFFF9800), onTap: widget.game.usePlateSmashBooster),
-                           const SizedBox(width: 16),
-                           _buildBoosterItem(Icons.bolt_rounded, 'STORM', const Color(0xFFFFD600), onTap: widget.game.useRustCleanseBooster),
+                          _buildBoosterItem(
+                            Icons.ac_unit_rounded,
+                            'CHRONOS',
+                            const Color(0xFF00E5FF),
+                            onTap: widget.game.useTimeFreezeBooster,
+                          ),
+                          const SizedBox(width: 16),
+                          _buildBoosterItem(
+                            Icons.gavel_rounded,
+                            'SMASH',
+                            const Color(0xFFFF9800),
+                            onTap: widget.game.usePlateSmashBooster,
+                          ),
+                          const SizedBox(width: 16),
+                          _buildBoosterItem(
+                            Icons.bolt_rounded,
+                            'STORM',
+                            const Color(0xFFFFD600),
+                            onTap: widget.game.useRustCleanseBooster,
+                          ),
                         ],
                       ),
-                      
+
                       // Elegant Vertical Divider
                       Container(
                         width: 1,
@@ -754,26 +818,39 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
                               builder: (context, percent, _) {
                                 final count = widget.game.comboCount;
                                 final isActive = percent > 0 && count > 1;
-                                final comboColor = count == 1 ? const Color(0xFFFFD600) : 
-                                                  (count == 2 ? const Color(0xFFFF9100) : const Color(0xFF00E5FF));
-                                
+                                final comboColor = count == 1
+                                    ? const Color(0xFFFFD600)
+                                    : (count == 2
+                                          ? const Color(0xFFFF9100)
+                                          : const Color(0xFF00E5FF));
+
                                 return AnimatedContainer(
                                   duration: const Duration(milliseconds: 250),
-                                  height: isActive ? 14 : 0, // Slides in gracefully!
-                                  margin: EdgeInsets.only(bottom: isActive ? 2 : 0),
+                                  height: isActive
+                                      ? 14
+                                      : 0, // Slides in gracefully!
+                                  margin: EdgeInsets.only(
+                                    bottom: isActive ? 2 : 0,
+                                  ),
                                   curve: Curves.easeOut,
                                   child: OverflowBox(
                                     minHeight: 0,
                                     maxHeight: 14,
                                     alignment: Alignment.bottomRight,
                                     child: AnimatedOpacity(
-                                      duration: const Duration(milliseconds: 200),
+                                      duration: const Duration(
+                                        milliseconds: 200,
+                                      ),
                                       opacity: isActive ? 1.0 : 0.0,
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           // Micro Glowing Icon
-                                          Icon(Icons.bolt_rounded, size: 10, color: comboColor),
+                                          Icon(
+                                            Icons.bolt_rounded,
+                                            size: 10,
+                                            color: comboColor,
+                                          ),
                                           Text(
                                             '${count}X',
                                             style: TextStyle(
@@ -781,7 +858,12 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
                                               fontSize: 10,
                                               fontWeight: FontWeight.w900,
                                               fontFamily: 'Courier',
-                                              shadows: [Shadow(color: comboColor, blurRadius: 5)],
+                                              shadows: [
+                                                Shadow(
+                                                  color: comboColor,
+                                                  blurRadius: 5,
+                                                ),
+                                              ],
                                             ),
                                           ),
                                           const SizedBox(width: 6),
@@ -791,19 +873,32 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
                                             height: 4,
                                             decoration: BoxDecoration(
                                               color: Colors.white10,
-                                              borderRadius: BorderRadius.circular(2),
-                                              border: Border.all(color: comboColor.withOpacity(0.3), width: 0.5),
+                                              borderRadius:
+                                                  BorderRadius.circular(2),
+                                              border: Border.all(
+                                                color: comboColor.withOpacity(
+                                                  0.3,
+                                                ),
+                                                width: 0.5,
+                                              ),
                                             ),
                                             clipBehavior: Clip.antiAlias,
                                             child: Stack(
                                               children: [
                                                 FractionallySizedBox(
-                                                  alignment: Alignment.centerLeft,
-                                                  widthFactor: percent.clamp(0.0, 1.0),
+                                                  alignment:
+                                                      Alignment.centerLeft,
+                                                  widthFactor: percent.clamp(
+                                                    0.0,
+                                                    1.0,
+                                                  ),
                                                   child: Container(
                                                     decoration: BoxDecoration(
                                                       gradient: LinearGradient(
-                                                        colors: [comboColor, Colors.white],
+                                                        colors: [
+                                                          comboColor,
+                                                          Colors.white,
+                                                        ],
                                                       ),
                                                     ),
                                                   ),
@@ -825,30 +920,38 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
                                 return Text(
                                   '$minutes:$seconds',
                                   style: TextStyle(
-                                    color: isFrozen 
-                                      ? const Color(0xFF00E5FF) 
-                                      : (isLowTime 
-                                          ? (time.floor() % 2 == 0 ? const Color(0xFFFF3333) : Colors.white)
-                                          : Colors.white),
+                                    color: isFrozen
+                                        ? const Color(0xFF00E5FF)
+                                        : (isLowTime
+                                              ? (time.floor() % 2 == 0
+                                                    ? const Color(0xFFFF3333)
+                                                    : Colors.white)
+                                              : Colors.white),
                                     fontSize: 32,
                                     fontWeight: FontWeight.w900,
                                     fontFamily: 'Courier',
                                     shadows: [
                                       Shadow(
-                                        color: isFrozen 
-                                          ? const Color(0xFF00E5FF).withOpacity(0.6) 
-                                          : (isLowTime ? const Color(0xFFFF3333) : const Color(0xFFFFD600).withOpacity(0.6)),
+                                        color: isFrozen
+                                            ? const Color(
+                                                0xFF00E5FF,
+                                              ).withOpacity(0.6)
+                                            : (isLowTime
+                                                  ? const Color(0xFFFF3333)
+                                                  : const Color(
+                                                      0xFFFFD600,
+                                                    ).withOpacity(0.6)),
                                         blurRadius: 15,
-                                      )
+                                      ),
                                     ],
                                   ),
                                 );
-                              }
+                              },
                             ),
                             Text(
                               LangService.t('hud_time_remaining'),
                               style: TextStyle(
-                                color: const Color(0xFFFFD600).withOpacity(0.6), 
+                                color: const Color(0xFFFFD600).withOpacity(0.6),
                                 fontSize: 8,
                                 fontFamily: 'monospace',
                                 fontWeight: FontWeight.bold,
@@ -862,17 +965,19 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
                   ),
                 ),
               ),
-              
+
               // 6. DYNAMIC FLOATING HUD ALERTS (Cyber Warning System)
               Positioned(
-                top: MediaQuery.of(context).size.height * 0.45, // Centered but slightly above midpoint
+                top:
+                    MediaQuery.of(context).size.height *
+                    0.45, // Centered but slightly above midpoint
                 left: 0,
                 right: 0,
                 child: ValueListenableBuilder<String?>(
                   valueListenable: widget.game.alertNotifier,
                   builder: (context, message, _) {
                     if (message == null) return const SizedBox.shrink();
-                    
+
                     return TweenAnimationBuilder<double>(
                       tween: Tween<double>(begin: 0.0, end: 1.0),
                       duration: const Duration(milliseconds: 200),
@@ -883,17 +988,25 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
                           child: Center(
                             child: IgnorePointer(
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 10,
+                                ),
                                 decoration: BoxDecoration(
                                   color: Colors.black,
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: const Color(0xFFFF3D00), width: 1.5), // Danger Red/Orange
+                                  border: Border.all(
+                                    color: const Color(0xFFFF3D00),
+                                    width: 1.5,
+                                  ), // Danger Red/Orange
                                   boxShadow: [
                                     BoxShadow(
-                                      color: const Color(0xFFFF3D00).withOpacity(0.35),
+                                      color: const Color(
+                                        0xFFFF3D00,
+                                      ).withOpacity(0.35),
                                       blurRadius: 20,
-                                    )
-                                  ]
+                                    ),
+                                  ],
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -920,33 +1033,53 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
                             ),
                           ),
                         );
-                      }
+                      },
                     );
-                  }
+                  },
                 ),
               ),
             ],
           ),
         );
-      }
+      },
     );
   }
 
   /// Core Glassmorphism Container Generator
-  Widget _buildGlassContainer({required Widget child, required EdgeInsets padding, required BorderRadius borderRadius}) {
+  Widget _buildGlassContainer({
+    required Widget child,
+    required EdgeInsets padding,
+    required BorderRadius borderRadius,
+  }) {
     return ClipRRect(
       borderRadius: borderRadius,
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5), // Optimized blur for better FPS
+        filter: ImageFilter.blur(
+          sigmaX: 5,
+          sigmaY: 5,
+        ), // Optimized blur for better FPS
         child: Container(
           padding: padding,
           decoration: BoxDecoration(
-            color: const Color(0xFF1A1A1A).withOpacity(0.65), // Rich carbon graphite tint
+            color: const Color(
+              0xFF1A1A1A,
+            ).withOpacity(0.65), // Rich carbon graphite tint
             borderRadius: borderRadius,
-            border: Border.all(color: Colors.white.withOpacity(0.12), width: 1.2), // Hairline highlight
+            border: Border.all(
+              color: Colors.white.withOpacity(0.12),
+              width: 1.2,
+            ), // Hairline highlight
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 30, spreadRadius: -5),
-              BoxShadow(color: const Color(0xFFFFD600).withOpacity(0.05), blurRadius: 20, spreadRadius: 5), // Cyan ambient glow
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 30,
+                spreadRadius: -5,
+              ),
+              BoxShadow(
+                color: const Color(0xFFFFD600).withOpacity(0.05),
+                blurRadius: 20,
+                spreadRadius: 5,
+              ), // Cyan ambient glow
             ],
           ),
           child: child,
@@ -955,7 +1088,10 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildIconButton({required IconData icon, required VoidCallback onPressed}) {
+  Widget _buildIconButton({
+    required IconData icon,
+    required VoidCallback onPressed,
+  }) {
     return IconButton(
       onPressed: onPressed,
       icon: Icon(icon, color: Colors.white.withOpacity(0.9), size: 24),
@@ -966,34 +1102,48 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildBoosterItem(IconData icon, String label, Color accentColor, {VoidCallback? onTap}) {
+  Widget _buildBoosterItem(
+    IconData icon,
+    String label,
+    Color accentColor, {
+    VoidCallback? onTap,
+  }) {
     ValueNotifier<int>? countNotifier;
     if (label == 'STORM') countNotifier = widget.game.stormCountNotifier;
     if (label == 'SMASH') countNotifier = widget.game.smashCountNotifier;
     if (label == 'CHRONOS') countNotifier = widget.game.chronosCountNotifier;
 
-    final isLocked = widget.game.currentLevel == 1; // Controls level 1 padlock visualization
+    final isLocked =
+        widget.game.currentLevel == 1; // Controls level 1 padlock visualization
     final step = widget.game.tutorialStepNotifier.value;
-    
+
     // Calculate whether interaction is blocked
     bool isClickBlocked = isLocked;
     if (step != null) {
-      isClickBlocked = true; // Default block during ANY active tutorial dialogue
-      
+      isClickBlocked =
+          true; // Default block during ANY active tutorial dialogue
+
       // SELECTIVELY UNLOCK only the booster corresponding to the active trial step
-      if (label == 'STORM' && step == TutorialStep.tryStorm) isClickBlocked = false;
-      if (label == 'SMASH' && step == TutorialStep.trySmash) isClickBlocked = false;
-      if (label == 'CHRONOS' && step == TutorialStep.tryChronos) isClickBlocked = false;
+      if (label == 'STORM' && step == TutorialStep.tryStorm)
+        isClickBlocked = false;
+      if (label == 'SMASH' && step == TutorialStep.trySmash)
+        isClickBlocked = false;
+      if (label == 'CHRONOS' && step == TutorialStep.tryChronos)
+        isClickBlocked = false;
     }
 
     return GestureDetector(
-      onTap: isClickBlocked ? null : () {
-        widget.game.audio.playBoosterClick();
-        if (onTap != null) onTap();
-      },
+      onTap: isClickBlocked
+          ? null
+          : () {
+              widget.game.audio.playBoosterClick();
+              if (onTap != null) onTap();
+            },
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 300),
-        opacity: isClickBlocked ? 0.4 : 1.0, // Dims out irrelevant boosters for visual focus!
+        opacity: isClickBlocked
+            ? 0.4
+            : 1.0, // Dims out irrelevant boosters for visual focus!
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1003,19 +1153,31 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: isClickBlocked ? Colors.black.withOpacity(0.6) : Colors.black.withOpacity(0.4),
+                    color: isClickBlocked
+                        ? Colors.black.withOpacity(0.6)
+                        : Colors.black.withOpacity(0.4),
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: isClickBlocked ? Colors.white10 : accentColor.withOpacity(0.4), 
-                      width: 1.5
+                      color: isClickBlocked
+                          ? Colors.white10
+                          : accentColor.withOpacity(0.4),
+                      width: 1.5,
                     ),
                     boxShadow: [
-                      if (!isClickBlocked) BoxShadow(color: accentColor.withOpacity(0.2), blurRadius: 15),
+                      if (!isClickBlocked)
+                        BoxShadow(
+                          color: accentColor.withOpacity(0.2),
+                          blurRadius: 15,
+                        ),
                     ],
                   ),
-                  child: Icon(icon, color: isClickBlocked ? Colors.grey : Colors.white, size: 22),
+                  child: Icon(
+                    icon,
+                    color: isClickBlocked ? Colors.grey : Colors.white,
+                    size: 22,
+                  ),
                 ),
-                
+
                 // LOCKED / BLOCKED OVERLAY (Rendered whenever interaction is disabled)
                 if (isClickBlocked)
                   Positioned(
@@ -1026,10 +1188,13 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
                       decoration: BoxDecoration(
                         color: const Color(0xFF111111),
                         shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xFFFFD600).withOpacity(0.6), width: 1),
+                        border: Border.all(
+                          color: const Color(0xFFFFD600).withOpacity(0.6),
+                          width: 1,
+                        ),
                         boxShadow: const [
                           BoxShadow(color: Colors.black87, blurRadius: 5),
-                        ]
+                        ],
                       ),
                       child: const Icon(
                         Icons.lock_outline_rounded,
@@ -1038,33 +1203,41 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
                       ),
                     ),
                   ),
-                
+
                 // PREMIUM BOOSTER CHARGE / INVENTORY BADGE (Replicates Lock Icon visual layout)
                 if (!isClickBlocked && countNotifier != null)
                   Positioned(
                     bottom: 0, // Exact Level 1 lock position
-                    right: 0,  // Exact Level 1 lock position
+                    right: 0, // Exact Level 1 lock position
                     child: ValueListenableBuilder<int>(
                       valueListenable: countNotifier,
                       builder: (context, count, _) {
                         final isZero = count <= 0;
                         return Container(
-                          padding: const EdgeInsets.all(4), // Matched lock icon padding
+                          padding: const EdgeInsets.all(
+                            4,
+                          ), // Matched lock icon padding
                           decoration: BoxDecoration(
-                            color: const Color(0xFF111111), // Exact matching dark background
+                            color: const Color(
+                              0xFF111111,
+                            ), // Exact matching dark background
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: isZero ? const Color(0xFFFFD600) : accentColor.withOpacity(0.8), // Glow
+                              color: isZero
+                                  ? const Color(0xFFFFD600)
+                                  : accentColor.withOpacity(0.8), // Glow
                               width: 1,
                             ),
                             boxShadow: const [
                               BoxShadow(color: Colors.black87, blurRadius: 5),
-                            ]
+                            ],
                           ),
                           child: isZero
                               ? const Icon(
                                   Icons.play_arrow_rounded,
-                                  color: Color(0xFFFFD600), // Pure play-arrow ad icon
+                                  color: Color(
+                                    0xFFFFD600,
+                                  ), // Pure play-arrow ad icon
                                   size: 9,
                                 )
                               : SizedBox(
@@ -1085,7 +1258,7 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
                                   ),
                                 ),
                         );
-                      }
+                      },
                     ),
                   ),
               ],
@@ -1094,20 +1267,21 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
             Text(
               label,
               style: TextStyle(
-                color: isClickBlocked ? Colors.white24 : Colors.white.withOpacity(0.6),
+                color: isClickBlocked
+                    ? Colors.white24
+                    : Colors.white.withOpacity(0.6),
                 fontSize: 9,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.5,
                 fontFamily: 'monospace',
               ),
-            )
+            ),
           ],
         ),
       ),
     );
   }
 }
-
 
 class _CornerBracket extends StatelessWidget {
   final int rotation;
@@ -1177,6 +1351,7 @@ class _MainMenuState extends State<MainMenu>
     with SingleTickerProviderStateMixin {
   late AnimationController _animController;
   late ScrollController _scrollController;
+  int _totalLevels = 10; // Default local fallback
 
   @override
   void initState() {
@@ -1188,8 +1363,47 @@ class _MainMenuState extends State<MainMenu>
 
     // With reverse:true, each node is 150px. Scroll (currentLevel-1)*150
     // so the current level appears near the bottom of the screen on open.
-    final targetOffset = ((widget.game.currentLevel - 1) * 150.0).clamp(0.0, double.infinity);
+    final targetOffset = ((widget.game.currentLevel - 1) * 150.0).clamp(
+      0.0,
+      double.infinity,
+    );
     _scrollController = ScrollController(initialScrollOffset: targetOffset);
+    _loadPersistedLevelCount();
+  }
+
+  Future<void> _loadPersistedLevelCount() async {
+    // 1. Load from local cache immediately (Sync)
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedCount = prefs.getInt('last_total_levels');
+      if (savedCount != null && mounted) {
+        setState(() {
+          _totalLevels = savedCount;
+        });
+      }
+    } catch (e) {
+      print('Local cache load failed: $e');
+    }
+
+    // 2. Fetch fresh data from Firebase (Async)
+    _fetchFreshLevelCount();
+  }
+
+  Future<void> _fetchFreshLevelCount() async {
+    try {
+      final count = await FirebaseLevelService().getTotalLevelCount();
+      if (count > 0 && mounted) {
+        setState(() {
+          _totalLevels = count;
+        });
+
+        // 3. Save to local cache for offline fallback
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt('last_total_levels', count);
+      }
+    } catch (e) {
+      print('Firebase count sync failed: $e');
+    }
   }
 
   @override
@@ -1244,89 +1458,91 @@ class _MainMenuState extends State<MainMenu>
   Widget _buildPremiumTopBar() {
     return ClipRRect(
       borderRadius: BorderRadius.circular(24),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5), // Optimized blur for better FPS
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
-          margin: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFF0A1128).withOpacity(0.45), // Deep space blue tint
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: Colors.white.withOpacity(0.15), width: 1.0),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 30,
-                spreadRadius: -5,
-              ),
-              BoxShadow(
-                color: const Color(0xFFFFD600).withOpacity(0.05), // Cyan ambient glow
-                blurRadius: 20,
-                spreadRadius: 5,
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFD600).withOpacity(0.1),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: const Color(0xFFFFD600).withOpacity(0.3),
-                        width: 1.5,
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons.precision_manufacturing_rounded,
-                      color: Color(0xFFFFD600),
-                      size: 20,
+      child: Container(
+        // Removed expensive BackdropFilter for TopBar
+        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
+        margin: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0A1128).withOpacity(
+            0.85,
+          ), // Increased opacity to maintain glass look without blur overhead
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white.withOpacity(0.15), width: 1.0),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 30,
+              spreadRadius: -5,
+            ),
+            BoxShadow(
+              color: const Color(
+                0xFFFFD600,
+              ).withOpacity(0.05), // Cyan ambient glow
+              blurRadius: 20,
+              spreadRadius: 5,
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFD600).withOpacity(0.1),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: const Color(0xFFFFD600).withOpacity(0.3),
+                      width: 1.5,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        LangService.t('main_current_sector'),
-                        style: TextStyle(
-                          color: const Color(0xFFFFD600).withOpacity(0.6),
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                      Text(
-                        'SCT-${widget.game.currentLevel.toString().padLeft(2, '0')}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1,
-                          fontFamily: 'Courier',
-                          shadows: [
-                            Shadow(color: Color(0xFFFFD600), blurRadius: 10),
-                          ],
-                        ),
-                      ),
-                    ],
+                  child: const Icon(
+                    Icons.precision_manufacturing_rounded,
+                    color: Color(0xFFFFD600),
+                    size: 20,
                   ),
-                ],
-              ),
-              _buildGlassIconButton(
-                icon: Icons.settings_outlined,
-                onPressed: () => widget.game.overlays.add('SettingsMenu'),
-              ),
-            ],
-          ),
+                ),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      LangService.t('main_current_sector'),
+                      style: TextStyle(
+                        color: const Color(0xFFFFD600).withOpacity(0.6),
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                    Text(
+                      'SCT-${widget.game.currentLevel.toString().padLeft(2, '0')}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1,
+                        fontFamily: 'Courier',
+                        shadows: [
+                          Shadow(color: Color(0xFFFFD600), blurRadius: 10),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            _buildGlassIconButton(
+              icon: Icons.settings_outlined,
+              onPressed: () => widget.game.overlays.add('SettingsMenu'),
+            ),
+          ],
         ),
       ),
     );
@@ -1344,7 +1560,11 @@ class _MainMenuState extends State<MainMenu>
       ),
       child: IconButton(
         onPressed: onPressed,
-        icon: Icon(icon, color: const Color(0xFFFFD600), size: 28), // Updated to Cyan
+        icon: Icon(
+          icon,
+          color: const Color(0xFFFFD600),
+          size: 28,
+        ), // Updated to Cyan
         padding: const EdgeInsets.all(12),
       ),
     );
@@ -1358,7 +1578,9 @@ class _MainMenuState extends State<MainMenu>
           return CustomPaint(
             painter: _ModernGridPainter(
               animValue: _animController.value,
-              gridColor: const Color(0xFFFFD600).withOpacity(0.05), // Updated to Cyan
+              gridColor: const Color(
+                0xFFFFD600,
+              ).withOpacity(0.05), // Updated to Cyan
             ),
           );
         },
@@ -1385,11 +1607,12 @@ class _MainMenuState extends State<MainMenu>
       reverse: true,
       padding: const EdgeInsets.only(top: 100, bottom: 200),
       physics: const BouncingScrollPhysics(),
-      itemCount: 50,
+      itemCount: _totalLevels + 1, // Dynamic Levels + 1 Coming Soon
       itemBuilder: (context, index) {
         final level = index + 1;
-        final isUnlocked = level <= widget.game.currentLevel;
-        final isCurrent = level == widget.game.currentLevel;
+        final isComingSoon = level > _totalLevels;
+        final isUnlocked = !isComingSoon && level <= widget.game.highestUnlockedLevel;
+        final isCurrent = !isComingSoon && level == widget.game.currentLevel;
 
         return AnimatedBuilder(
           animation: _animController,
@@ -1398,6 +1621,8 @@ class _MainMenuState extends State<MainMenu>
               level: level,
               isUnlocked: isUnlocked,
               isCurrent: isCurrent,
+              isComingSoon: isComingSoon,
+              totalLevels: _totalLevels,
               game: widget.game,
               index: index,
               animValue: _animController.value,
@@ -1467,7 +1692,8 @@ class _ParticlePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = const Color(0xFFFFD600).withOpacity(0.15); // Updated to Cyan
+    final paint = Paint()
+      ..color = const Color(0xFFFFD600).withOpacity(0.15); // Updated to Cyan
 
     for (var i = 0; i < particles.length; i++) {
       final p = particles[i];
@@ -1601,6 +1827,8 @@ class _ModernJourneyNode extends StatelessWidget {
   final int level;
   final bool isUnlocked;
   final bool isCurrent;
+  final bool isComingSoon;
+  final int totalLevels;
   final ScrewPuzzleGame game;
   final int index;
   final double animValue;
@@ -1609,6 +1837,8 @@ class _ModernJourneyNode extends StatelessWidget {
     required this.level,
     required this.isUnlocked,
     required this.isCurrent,
+    required this.isComingSoon,
+    required this.totalLevels,
     required this.game,
     required this.index,
     required this.animValue,
@@ -1628,13 +1858,14 @@ class _ModernJourneyNode extends StatelessWidget {
         clipBehavior: Clip.none,
         children: [
           // Elegant Path
-          if (index < 49)
+          if (index < totalLevels)
             Positioned.fill(
               child: CustomPaint(
                 painter: _ModernPathPainter(
                   start: Offset(dx, cellHeight / 2),
                   end: Offset(nextDx, -cellHeight / 2),
-                  isUnlocked: isUnlocked && (level < game.currentLevel),
+                  isUnlocked: isUnlocked && (level < game.highestUnlockedLevel),
+                  isComingSoon: isComingSoon,
                   animValue: animValue,
                 ),
               ),
@@ -1670,24 +1901,22 @@ class _ModernJourneyNode extends StatelessWidget {
           height: 90,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.6),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              ),
-              if (isCurrent)
-                BoxShadow(
-                  color: const Color(0xFFFF9800).withOpacity(0.4),
-                  blurRadius: 30,
-                  spreadRadius: 8,
-                ),
-            ],
+            // Optimized shadows for Impeller stability
+            boxShadow: isCurrent
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFFFFD600).withOpacity(0.2),
+                      blurRadius: 20,
+                      spreadRadius: 4,
+                    ),
+                  ]
+                : [],
           ),
           child: CustomPaint(
             painter: _BoltNodePainter(
               isUnlocked: isUnlocked,
               isCurrent: isCurrent,
+              isComingSoon: isComingSoon,
               animValue: animValue,
               level: level,
             ),
@@ -1701,12 +1930,14 @@ class _ModernJourneyNode extends StatelessWidget {
 class _BoltNodePainter extends CustomPainter {
   final bool isUnlocked;
   final bool isCurrent;
+  final bool isComingSoon;
   final double animValue;
   final int level;
 
   _BoltNodePainter({
     required this.isUnlocked,
     required this.isCurrent,
+    required this.isComingSoon,
     required this.animValue,
     required this.level,
   });
@@ -1786,6 +2017,29 @@ class _BoltNodePainter extends CustomPainter {
     canvas.restore();
 
     // 5. Level Badge (Terminal Style)
+    if (isComingSoon) {
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: "COMING\nSOON",
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.3),
+            fontSize: 10,
+            height: 1.0,
+            letterSpacing: 1.0,
+            fontWeight: FontWeight.w900,
+            fontFamily: 'monospace',
+          ),
+        ),
+        textAlign: TextAlign.center,
+        textDirection: TextDirection.ltr,
+      )..layout();
+      textPainter.paint(
+        canvas,
+        center - Offset(textPainter.width / 2, textPainter.height / 2),
+      );
+      return;
+    }
+
     if (isUnlocked) {
       final badgeRect = Rect.fromCenter(
         center: center + Offset(0, radius + 15),
@@ -1807,7 +2061,8 @@ class _BoltNodePainter extends CustomPainter {
 
       if (isCurrent) {
         final badgeGlow = Paint()
-          ..color = const Color(0xFFFFD600).withOpacity(0.3) // Updated to Cyan
+          ..color = const Color(0xFFFFD600)
+              .withOpacity(0.3) // Updated to Cyan
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
         canvas.drawRRect(
           RRect.fromRectAndRadius(badgeRect, const Radius.circular(4)),
@@ -1858,7 +2113,8 @@ class _BoltNodePainter extends CustomPainter {
     // 6. Current Scanning Ring
     if (isCurrent) {
       final scanPaint = Paint()
-        ..color = const Color(0xFFFFD600).withOpacity(0.6 * (1.0 - animValue)) // Updated to Cyan
+        ..color = const Color(0xFFFFD600)
+            .withOpacity(0.6 * (1.0 - animValue)) // Updated to Cyan
         ..style = PaintingStyle.stroke
         ..strokeWidth = 3;
       canvas.drawCircle(center, radius + 5 + (animValue * 15), scanPaint);
@@ -1874,17 +2130,21 @@ class _ModernPathPainter extends CustomPainter {
   final Offset start;
   final Offset end;
   final bool isUnlocked;
+  final bool isComingSoon;
   final double animValue;
 
   _ModernPathPainter({
     required this.start,
     required this.end,
     required this.isUnlocked,
+    required this.isComingSoon,
     required this.animValue,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (isComingSoon) return; // Don't draw path to Coming Soon node yet
+
     final path = Path()
       ..moveTo(start.dx, start.dy)
       ..cubicTo(start.dx, start.dy - 60, end.dx, end.dy + 60, end.dx, end.dy);
@@ -1957,7 +2217,10 @@ class _ModernPlayButton extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(35),
           gradient: const LinearGradient(
-            colors: [Color(0xFFFF3D00), Color(0xFFFFAB00)], // Harmonized Heat Gradient
+            colors: [
+              Color(0xFFFF3D00),
+              Color(0xFFFFAB00),
+            ], // Harmonized Heat Gradient
             begin: Alignment.centerLeft,
             end: Alignment.centerRight,
           ),
@@ -1975,9 +2238,7 @@ class _ModernPlayButton extends StatelessWidget {
           child: Stack(
             children: [
               Positioned.fill(
-                  child: CustomPaint(
-                    painter: _ButtonPatternPainter(),
-                  ),
+                child: CustomPaint(painter: _ButtonPatternPainter()),
               ),
               Center(
                 child: Row(
@@ -2021,7 +2282,10 @@ class _ButtonPatternPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white.withOpacity(0.2) // Handled directly in painter for Impeller stability
+      ..color = Colors.white
+          .withOpacity(
+            0.2,
+          ) // Handled directly in painter for Impeller stability
       ..strokeWidth = 1;
     for (double i = 0; i < size.width; i += 10) {
       canvas.drawLine(Offset(i, 0), Offset(i - 20, size.height), paint);
@@ -2039,17 +2303,20 @@ class AdConfirmationOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isBoosterAd = game.pendingAdBooster != null;
-    
-    final titleText = isBoosterAd ? 'REFILL ${game.pendingAdBooster}' : 'UNLOCK SLOT';
-    final descText = isBoosterAd 
+
+    final titleText = isBoosterAd
+        ? 'REFILL ${game.pendingAdBooster}'
+        : 'UNLOCK SLOT';
+    final descText = isBoosterAd
         ? 'Watch a short video to instantly claim +1 ${game.pendingAdBooster} booster charge.'
         : 'Watch a short video to gain permanent access to this industrial slot.';
-        
+
     IconData displayIcon = Icons.lock_open_rounded;
     if (isBoosterAd) {
       if (game.pendingAdBooster == 'STORM') displayIcon = Icons.bolt_rounded;
       if (game.pendingAdBooster == 'SMASH') displayIcon = Icons.gavel_rounded;
-      if (game.pendingAdBooster == 'CHRONOS') displayIcon = Icons.ac_unit_rounded;
+      if (game.pendingAdBooster == 'CHRONOS')
+        displayIcon = Icons.ac_unit_rounded;
     }
 
     return Stack(
@@ -2085,7 +2352,9 @@ class AdConfirmationOverlay extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFFFFD600).withOpacity(0.2), // Cyan Shadow
+                    color: const Color(
+                      0xFFFFD600,
+                    ).withOpacity(0.2), // Cyan Shadow
                     blurRadius: 30,
                     spreadRadius: 5,
                   ),
@@ -2104,7 +2373,9 @@ class AdConfirmationOverlay extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFD600).withOpacity(0.1), // Cyan Light
+                        color: const Color(
+                          0xFFFFD600,
+                        ).withOpacity(0.1), // Cyan Light
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
@@ -2158,7 +2429,7 @@ class AdConfirmationOverlay extends StatelessWidget {
                             onPressed: () {
                               game.overlays.remove('AdConfirmation');
                               game.overlays.add('Loading');
-                              
+
                               // PREVENT EXPLOITS: Freeze the entire physics & timer engine while watching!
                               game.paused = true;
 
@@ -2168,9 +2439,12 @@ class AdConfirmationOverlay extends StatelessWidget {
                                 },
                                 onRewardEarned: () {
                                   if (isBoosterAd) {
-                                    if (game.pendingAdBooster == 'STORM') game.stormCountNotifier.value++;
-                                    if (game.pendingAdBooster == 'SMASH') game.smashCountNotifier.value++;
-                                    if (game.pendingAdBooster == 'CHRONOS') game.chronosCountNotifier.value++;
+                                    if (game.pendingAdBooster == 'STORM')
+                                      game.stormCountNotifier.value++;
+                                    if (game.pendingAdBooster == 'SMASH')
+                                      game.smashCountNotifier.value++;
+                                    if (game.pendingAdBooster == 'CHRONOS')
+                                      game.chronosCountNotifier.value++;
                                     game.saveBoosterInventory();
                                     game.audio.playVictory();
                                     game.pendingAdBooster = null;
@@ -2185,7 +2459,8 @@ class AdConfirmationOverlay extends StatelessWidget {
                                 },
                                 onAdFailed: () {
                                   game.overlays.remove('Loading');
-                                  game.paused = false; // Unpause engine if request errors!
+                                  game.paused =
+                                      false; // Unpause engine if request errors!
                                 },
                                 onAdDismissed: () {
                                   // CRITICAL: Re-activate the engine no matter what once ad closes!
@@ -2303,14 +2578,9 @@ class _SettingsMenuState extends State<SettingsMenu> {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // 1. Heavy Dimensional Frost Backdrop
+        // 1. Efficient Dimensional Overlay (No Blur overhead)
         Positioned.fill(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-            child: Container(
-              color: Colors.black.withOpacity(0.75),
-            ),
-          ),
+          child: Container(color: Colors.black.withOpacity(0.85)),
         ),
         // 2. Kinetic Dialog Body
         Center(
@@ -2318,7 +2588,8 @@ class _SettingsMenuState extends State<SettingsMenu> {
             tween: Tween(begin: 0.8, end: 1.0),
             duration: const Duration(milliseconds: 350),
             curve: Curves.easeOutBack,
-            builder: (context, scale, child) => Transform.scale(scale: scale, child: child),
+            builder: (context, scale, child) =>
+                Transform.scale(scale: scale, child: child),
             child: Container(
               width: 330,
               padding: const EdgeInsets.all(2),
@@ -2338,7 +2609,7 @@ class _SettingsMenuState extends State<SettingsMenu> {
                     color: Colors.black.withOpacity(0.8),
                     blurRadius: 40,
                     spreadRadius: 10,
-                  )
+                  ),
                 ],
               ),
               child: Container(
@@ -2365,8 +2636,12 @@ class _SettingsMenuState extends State<SettingsMenu> {
                           ),
                         ),
                         IconButton(
-                          onPressed: () => widget.game.overlays.remove('SettingsMenu'),
-                          icon: const Icon(Icons.close_rounded, color: Colors.white60),
+                          onPressed: () =>
+                              widget.game.overlays.remove('SettingsMenu'),
+                          icon: const Icon(
+                            Icons.close_rounded,
+                            color: Colors.white60,
+                          ),
                         ),
                       ],
                     ),
@@ -2384,14 +2659,15 @@ class _SettingsMenuState extends State<SettingsMenu> {
                       onChanged: (val) {
                         setState(() => _soundEnabled = val);
                         // Triggers background routing loop logic
-                        widget.game.audio.playBoosterClick(); 
+                        widget.game.audio.playBoosterClick();
                       },
                     ),
                     const SizedBox(height: 8),
                     // NEW: PREMIUM GLOBAL LANGUAGE SELECTOR
                     _buildNavTile(
                       icon: Icons.language_rounded,
-                      title: '${LangService.t('sett_language')}: ${LangService.t('sett_lang_display').toUpperCase()}',
+                      title:
+                          '${LangService.t('sett_language')}: ${LangService.t('sett_lang_display').toUpperCase()}',
                       onTap: () {
                         widget.game.audio.playBoosterClick();
                         _showLanguageSelector(context);
@@ -2408,21 +2684,26 @@ class _SettingsMenuState extends State<SettingsMenu> {
                     _buildNavTile(
                       icon: Icons.privacy_tip_outlined,
                       title: LangService.t('sett_privacy'),
-                      onTap: () => _launchURL('https://eamonstudio.com/boltforge/privacy-policy'),
+                      onTap: () => _launchURL(
+                        'https://eamonstudio.com/boltforge/privacy-policy',
+                      ),
                     ),
                     _buildNavTile(
                       icon: Icons.article_outlined,
                       title: LangService.t('sett_terms'),
-                      onTap: () => _launchURL('https://eamonstudio.com/boltforge/terms-of-service'),
+                      onTap: () => _launchURL(
+                        'https://eamonstudio.com/boltforge/terms-of-service',
+                      ),
                     ),
                     _buildNavTile(
                       icon: Icons.info_outline_rounded,
                       title: LangService.t('sett_about'),
-                      onTap: () => _launchURL('https://eamonstudio.com/boltforge'),
+                      onTap: () =>
+                          _launchURL('https://eamonstudio.com/boltforge'),
                     ),
 
                     const SizedBox(height: 32),
-                    
+
                     // FOOTER TELEMETRY
                     Text(
                       '${LangService.t('sett_version')}: 1.0.5-BETA',
@@ -2461,7 +2742,9 @@ class _SettingsMenuState extends State<SettingsMenu> {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
               ),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(30),
+              ),
               border: Border.all(
                 color: const Color(0xFFFF9800).withOpacity(0.3),
                 width: 1.5,
@@ -2497,7 +2780,8 @@ class _SettingsMenuState extends State<SettingsMenu> {
                     shrinkWrap: true,
                     physics: const BouncingScrollPhysics(),
                     children: LangService.supportedLocales.entries.map((entry) {
-                      final bool isSelected = LangService().currentLang == entry.key;
+                      final bool isSelected =
+                          LangService().currentLang == entry.key;
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 12.0),
                         child: GestureDetector(
@@ -2505,20 +2789,25 @@ class _SettingsMenuState extends State<SettingsMenu> {
                             widget.game.audio.playBoosterClick();
                             await LangService().setLanguage(entry.key);
                             Navigator.pop(ctx); // Dismiss sheet safely
-                            setState(() {}); // Force Settings dialog to redraw text fields
+                            setState(
+                              () {},
+                            ); // Force Settings dialog to redraw text fields
                           },
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 18,
+                            ),
                             decoration: BoxDecoration(
-                              color: isSelected 
-                                ? const Color(0xFFFF9800).withOpacity(0.15) 
-                                : Colors.white.withOpacity(0.03),
+                              color: isSelected
+                                  ? const Color(0xFFFF9800).withOpacity(0.15)
+                                  : Colors.white.withOpacity(0.03),
                               borderRadius: BorderRadius.circular(15),
                               border: Border.all(
-                                color: isSelected 
-                                  ? const Color(0xFFFF9800).withOpacity(0.8) 
-                                  : Colors.white.withOpacity(0.1),
+                                color: isSelected
+                                    ? const Color(0xFFFF9800).withOpacity(0.8)
+                                    : Colors.white.withOpacity(0.1),
                                 width: 1.5,
                               ),
                             ),
@@ -2528,7 +2817,9 @@ class _SettingsMenuState extends State<SettingsMenu> {
                                 Text(
                                   entry.value,
                                   style: TextStyle(
-                                    color: isSelected ? Colors.white : Colors.white70,
+                                    color: isSelected
+                                        ? Colors.white
+                                        : Colors.white70,
                                     fontFamily: 'Courier',
                                     fontSize: 14,
                                     fontWeight: FontWeight.w900,
@@ -2597,11 +2888,18 @@ class _SettingsMenuState extends State<SettingsMenu> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
                 ),
                 Text(
                   subtitle,
-                  style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.4),
+                    fontSize: 11,
+                  ),
                 ),
               ],
             ),
@@ -2645,7 +2943,11 @@ class _SettingsMenuState extends State<SettingsMenu> {
                   ),
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded, color: Colors.white24, size: 20),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: Colors.white24,
+                size: 20,
+              ),
             ],
           ),
         ),
@@ -2664,7 +2966,8 @@ class TutorialOverlay extends StatefulWidget {
   State<TutorialOverlay> createState() => _TutorialOverlayState();
 }
 
-class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProviderStateMixin {
+class _TutorialOverlayState extends State<TutorialOverlay>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _animController;
 
   @override
@@ -2695,10 +2998,10 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
     try {
       final viewfinder = widget.game.camera.viewfinder;
       final viewport = widget.game.camera.viewport;
-      
+
       final offset = worldPos - viewfinder.position;
       final scaledOffset = offset * viewfinder.zoom;
-      
+
       return Offset(
         (viewport.size.x / 2) + scaledOffset.x,
         (viewport.size.y / 2) + scaledOffset.y,
@@ -2718,7 +3021,7 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
     String? buttonText;
     VoidCallback? onButtonPressed;
     Alignment alignment = const Alignment(0, 0.35);
-    
+
     // Pointer configurations
     Offset? pointerPosition;
     bool showPointer = false;
@@ -2733,7 +3036,7 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
         };
         alignment = Alignment.center;
         break;
-      
+
       case TutorialStep.explainTimer:
         title = LangService.t('tuto_timer_t');
         content = LangService.t('tuto_timer_c');
@@ -2741,20 +3044,23 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
         onButtonPressed = () {
           widget.game.tutorialStepNotifier.value = TutorialStep.selectLeftBolt;
         };
-        
+
         // Calculate precise dynamic coordinates of the bottom right timer
         final screenWidth = MediaQuery.of(context).size.width;
         final screenHeight = MediaQuery.of(context).size.height;
         final bottomPadding = MediaQuery.of(context).padding.bottom;
-        
+
         // Center perfectly over the timer digits in the bottom dock
         final adHeight = widget.game.hasActiveBannerAd ? 50.0 : 0.0;
         final timerX = screenWidth - 85;
         final timerY = screenHeight - (65 + bottomPadding + adHeight);
-        
+
         pointerPosition = Offset(timerX, timerY);
         showPointer = true;
-        alignment = const Alignment(0, -0.1); // Raised up so it doesn't overlap with the pointer and timer
+        alignment = const Alignment(
+          0,
+          -0.1,
+        ); // Raised up so it doesn't overlap with the pointer and timer
         break;
 
       case TutorialStep.selectLeftBolt:
@@ -2790,7 +3096,8 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
         content = LangService.t('tuto_swing_c');
         buttonText = LangService.t('tuto_continue');
         onButtonPressed = () {
-          widget.game.tutorialStepNotifier.value = TutorialStep.selectCenterBolt;
+          widget.game.tutorialStepNotifier.value =
+              TutorialStep.selectCenterBolt;
         };
         break;
 
@@ -2812,15 +3119,22 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
       case TutorialStep.explainRust:
         title = LangService.t('tuto_rust_t');
         content = LangService.t('tuto_rust_c');
-        pointerPosition = _getWorldToScreen(Vector2(-2.0, 20.0)); // Point straight to top-left rusty bolt
+        pointerPosition = _getWorldToScreen(
+          Vector2(-2.0, 20.0),
+        ); // Point straight to top-left rusty bolt
         showPointer = true;
-        alignment = const Alignment(0, 0.5); // Position box BEAUTIFULLY near bottom!
+        alignment = const Alignment(
+          0,
+          0.5,
+        ); // Position box BEAUTIFULLY near bottom!
         break;
 
       case TutorialStep.selectTutorialRustBolt:
         title = LangService.t('tuto_free_t');
         content = LangService.t('tuto_free_c');
-        pointerPosition = _getWorldToScreen(Vector2(-2.0, 20.0)); // Point to target cleared bolt
+        pointerPosition = _getWorldToScreen(
+          Vector2(-2.0, 20.0),
+        ); // Point to target cleared bolt
         showPointer = true;
         alignment = const Alignment(0, 0.5);
         break;
@@ -2828,7 +3142,9 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
       case TutorialStep.moveTutorialRustBolt:
         title = LangService.t('tuto_move_t');
         content = LangService.t('tuto_move_c');
-        pointerPosition = _getWorldToScreen(Vector2(-2.0, 18.0)); // Point to target hole
+        pointerPosition = _getWorldToScreen(
+          Vector2(-2.0, 18.0),
+        ); // Point to target hole
         showPointer = true;
         alignment = const Alignment(0, 0.5);
         break;
@@ -2850,7 +3166,10 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
           final screenHeight = MediaQuery.of(context).size.height;
           final bottomPadding = MediaQuery.of(context).padding.bottom;
           final adHeight = widget.game.hasActiveBannerAd ? 50.0 : 0.0;
-          pointerPosition = Offset(207, screenHeight - (70 + adHeight + bottomPadding));
+          pointerPosition = Offset(
+            207,
+            screenHeight - (70 + adHeight + bottomPadding),
+          );
           showPointer = true;
           alignment = const Alignment(0, -0.15);
         }
@@ -2873,7 +3192,10 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
           final screenHeight = MediaQuery.of(context).size.height;
           final bottomPadding = MediaQuery.of(context).padding.bottom;
           final adHeight = widget.game.hasActiveBannerAd ? 50.0 : 0.0;
-          pointerPosition = Offset(137, screenHeight - (70 + adHeight + bottomPadding));
+          pointerPosition = Offset(
+            137,
+            screenHeight - (70 + adHeight + bottomPadding),
+          );
           showPointer = true;
           alignment = const Alignment(0, -0.15);
         }
@@ -2896,7 +3218,10 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
           final screenHeight = MediaQuery.of(context).size.height;
           final bottomPadding = MediaQuery.of(context).padding.bottom;
           final adHeight = widget.game.hasActiveBannerAd ? 50.0 : 0.0;
-          pointerPosition = Offset(67, screenHeight - (70 + adHeight + bottomPadding));
+          pointerPosition = Offset(
+            67,
+            screenHeight - (70 + adHeight + bottomPadding),
+          );
           showPointer = true;
           alignment = const Alignment(0, -0.15);
         }
@@ -2906,7 +3231,7 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
     return Stack(
       children: [
         // Full screen backdrop blur (ONLY for non-interactive welcome/explanation steps)
-        if (step == TutorialStep.welcome || 
+        if (step == TutorialStep.welcome ||
             step == TutorialStep.introBoosters ||
             step == TutorialStep.explainSmash ||
             step == TutorialStep.explainChronos)
@@ -2922,12 +3247,13 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
           valueListenable: widget.game.rustTutorialHitsNotifier,
           builder: (context, hits, _) {
             String finalContent = content;
-            
+
             // DYNAMIC HUD UPDATE: Refresh the text with exact clicks remaining!
             if (step == TutorialStep.explainRust) {
-              finalContent = "${LangService.t('tuto_rust_c')}\n\n🎯 **${LangService.t('tuto_rust_hits')}: $hits / 6**";
+              finalContent =
+                  "${LangService.t('tuto_rust_c')}\n\n🎯 **${LangService.t('tuto_rust_hits')}: $hits / 6**";
             }
-            
+
             return _TutorialDialog(
               title: title,
               content: finalContent,
@@ -2935,19 +3261,22 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
               buttonText: buttonText,
               onButtonPressed: onButtonPressed,
             );
-          }
+          },
         ),
 
         // Pulsing pointing element on top of active bolt/hole/booster AND dialog!
-        if (showPointer && pointerPosition != null && pointerPosition != Offset.zero)
+        if (showPointer &&
+            pointerPosition != null &&
+            pointerPosition != Offset.zero)
           IgnorePointer(
             child: _InteractivePointer(
               position: pointerPosition,
               controller: _animController,
-              isTimerArrow: step == TutorialStep.explainTimer || 
-                            step == TutorialStep.tryStorm ||
-                            step == TutorialStep.trySmash ||
-                            step == TutorialStep.tryChronos,
+              isTimerArrow:
+                  step == TutorialStep.explainTimer ||
+                  step == TutorialStep.tryStorm ||
+                  step == TutorialStep.trySmash ||
+                  step == TutorialStep.tryChronos,
             ),
           ),
       ],
@@ -2993,16 +3322,20 @@ class _InteractivePointer extends StatelessWidget {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: const Color(0xFFFFD600).withOpacity((1.0 - value).clamp(0.0, 1.0)),
+                            color: const Color(
+                              0xFFFFD600,
+                            ).withOpacity((1.0 - value).clamp(0.0, 1.0)),
                             width: 2.5,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFFFFD600).withOpacity((0.5 * (1.0 - value)).clamp(0.0, 1.0)),
+                              color: const Color(0xFFFFD600).withOpacity(
+                                (0.5 * (1.0 - value)).clamp(0.0, 1.0),
+                              ),
                               blurRadius: 8,
                               spreadRadius: 1,
-                            )
-                          ]
+                            ),
+                          ],
                         ),
                       ),
                       Container(
@@ -3043,17 +3376,22 @@ class _InteractivePointer extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: const Color(0xFF1A1A1A),
                           shape: BoxShape.circle,
-                          border: Border.all(color: const Color(0xFFFFD600), width: 2),
+                          border: Border.all(
+                            color: const Color(0xFFFFD600),
+                            width: 2,
+                          ),
                           boxShadow: [
                             BoxShadow(
                               color: const Color(0xFFFFD600).withOpacity(0.6),
                               blurRadius: 15,
                               spreadRadius: 2,
-                            )
+                            ),
                           ],
                         ),
                         child: Icon(
-                          isTimerArrow ? Icons.arrow_downward_rounded : Icons.touch_app_rounded,
+                          isTimerArrow
+                              ? Icons.arrow_downward_rounded
+                              : Icons.touch_app_rounded,
                           color: const Color(0xFFFFD600),
                           size: 22,
                         ),
@@ -3062,7 +3400,9 @@ class _InteractivePointer extends StatelessWidget {
                       // Little glowing triangle pointing down
                       CustomPaint(
                         size: const Size(14, 8),
-                        painter: _TrianglePainter(color: const Color(0xFFFFD600)),
+                        painter: _TrianglePainter(
+                          color: const Color(0xFFFFD600),
+                        ),
                       ),
                     ],
                   ),
@@ -3177,8 +3517,8 @@ class _TutorialDialog extends StatelessWidget {
                                 color: const Color(0xFFFFD600).withOpacity(0.8),
                                 blurRadius: 6,
                                 spreadRadius: 1,
-                              )
-                            ]
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -3205,12 +3545,12 @@ class _TutorialDialog extends StatelessWidget {
                           colors: [
                             const Color(0xFFFFD600).withOpacity(0.6),
                             Colors.transparent,
-                          ]
-                        )
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // Tutorial Text Content
                     Text(
                       content,
@@ -3233,7 +3573,9 @@ class _TutorialDialog extends StatelessWidget {
                           decoration: BoxDecoration(
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFFFFD600).withOpacity(0.35),
+                                color: const Color(
+                                  0xFFFFD600,
+                                ).withOpacity(0.35),
                                 blurRadius: 15,
                                 offset: const Offset(0, 4),
                               ),
@@ -3248,7 +3590,10 @@ class _TutorialDialog extends StatelessWidget {
                               elevation: 0,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
-                                side: const BorderSide(color: Colors.white30, width: 1),
+                                side: const BorderSide(
+                                  color: Colors.white30,
+                                  width: 1,
+                                ),
                               ),
                             ),
                             child: Row(
@@ -3264,7 +3609,10 @@ class _TutorialDialog extends StatelessWidget {
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                const Icon(Icons.arrow_right_alt_rounded, size: 22),
+                                const Icon(
+                                  Icons.arrow_right_alt_rounded,
+                                  size: 22,
+                                ),
                               ],
                             ),
                           ),

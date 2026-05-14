@@ -18,6 +18,7 @@ import '../components/timer_text.dart';
 import '../utils/level_manager.dart';
 import '../utils/audio_service.dart';
 import '../utils/ad_service.dart';
+import '../utils/firebase_level_service.dart';
 import '../utils/lang_service.dart';
 
 enum TutorialStep {
@@ -47,6 +48,8 @@ class ScrewPuzzleGame extends Forge2DGame {
   late final LevelManager levelManager;
   final audio = AudioService();
   int currentLevel = 1;
+  int highestUnlockedLevel = 1;
+  int totalLevelsAvailable = 10; // Cached from Firebase or local
   final timeBonusNotifier = ValueNotifier<double>(0.0); // Kept for internal trigger
   final comboUpdateNotifier = ValueNotifier<double>(0.0); // Smooth broadcast of decay bar
   final tutorialStepNotifier = ValueNotifier<TutorialStep?>(null);
@@ -130,9 +133,16 @@ class ScrewPuzzleGame extends Forge2DGame {
 
     levelManager = LevelManager(this);
 
-    // PERSISTENCE: Load last played level
+    // PERSISTENCE: Load progress
     final prefs = await SharedPreferences.getInstance();
-    currentLevel = prefs.getInt('current_level') ?? 1;
+    highestUnlockedLevel = prefs.getInt('current_level') ?? 1;
+    currentLevel = highestUnlockedLevel;
+
+    // Fetch total levels available for progression logic
+    final count = await FirebaseLevelService().getTotalLevelCount();
+    if (count > 0) {
+      totalLevelsAvailable = count;
+    }
     
     // Load booster inventory
     stormCountNotifier.value = prefs.getInt('booster_storm') ?? 2;
@@ -449,17 +459,20 @@ class ScrewPuzzleGame extends Forge2DGame {
   Future<void> nextLevel() async {
     _isVictoryTriggered = false;
     _clearTimeFreeze();
+    // Logic: Only advance highestUnlockedLevel if we completed our furthest level
+    if (currentLevel == highestUnlockedLevel) {
+      highestUnlockedLevel++;
+      // PERSISTENCE: Save progress
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('current_level', highestUnlockedLevel);
+    }
+
+    // Move to the next level number
     currentLevel++;
 
-    // PERSISTENCE: Save progress
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('current_level', currentLevel);
-
-    if (currentLevel > 10) {
-      // Game Complete!
-      currentLevel = 1;
-      await prefs.setInt('current_level', currentLevel);
-
+    // Check if we reached the end of available content
+    if (currentLevel > totalLevelsAvailable) {
+      // No more levels! Go back to menu
       overlays.remove('HUD');
       overlays.add('MainMenu');
       audio.playMenuBGM();
@@ -750,7 +763,7 @@ class ScrewPuzzleGame extends Forge2DGame {
 
       // Tutorial Advance
       if (step == TutorialStep.selectLeftBolt) tutorialStepNotifier.value = TutorialStep.moveLeftBolt;
-      if (step == TutorialStep.selectRightBolt) tutorialStepNotifier.value = TutorialStep.selectRightBolt;
+      if (step == TutorialStep.selectRightBolt) tutorialStepNotifier.value = TutorialStep.moveRightBolt;
       if (step == TutorialStep.selectCenterBolt) tutorialStepNotifier.value = TutorialStep.moveCenterBolt;
       if (step == TutorialStep.selectTutorialRustBolt) tutorialStepNotifier.value = TutorialStep.moveTutorialRustBolt;
     }

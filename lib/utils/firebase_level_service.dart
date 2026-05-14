@@ -38,6 +38,17 @@ class FirebaseLevelService {
     return null;
   }
 
+  /// Dynamically determines the total number of levels available in Firestore.
+  Future<int> getTotalLevelCount() async {
+    try {
+      final snapshot = await _firestore.collection('levels').count().get();
+      return snapshot.count ?? 0;
+    } catch (e) {
+      print('Error getting total level count: $e');
+      return 0; // Fallback to 0, which will trigger local fallback logic
+    }
+  }
+
   /// Optional: Helper method to upload a local level file to Firestore.
   /// Useful for the initial setup.
   Future<void> uploadLevel(int levelNumber, Map<String, dynamic> data) async {

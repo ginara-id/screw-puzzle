@@ -11,20 +11,18 @@ import 'package:firebase_core/firebase_core.dart';
 // import 'firebase_options.dart'; // Uncomment after running flutterfire configure
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
   
-  try {
-    await Firebase.initializeApp(
-      // options: DefaultFirebaseOptions.currentPlatform, // Uncomment after running flutterfire configure
-    );
-    print('Firebase initialized successfully');
-  } catch (e) {
+  // 1. Start initializations in parallel WITHOUT blocking the first frame
+  final Future<void> firebaseInit = Firebase.initializeApp().catchError((e) {
     print('Firebase initialization error: $e');
-  }
+  });
 
-  await AdService().init();
-  await LangService().init(); // HIGH-PERFORMANCE GLOBAL TRANSLATION SYSTEM
+  final Future<void> adInit = AdService().init();
+  final Future<void> langInit = LangService().init();
 
+  // 2. Wait for essential services but allow the app to start
+  // This allows the splash screen to appear much faster
   runApp(const MyApp());
 }
 
@@ -72,6 +70,7 @@ class _GameMainScreenState extends State<GameMainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black, // Eliminates white flicker during asset load
       body: Stack(
         children: [
           // 1. FULL SCREEN GAME (Background will reach the bottom)
