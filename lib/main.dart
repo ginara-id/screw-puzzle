@@ -7,9 +7,21 @@ import 'utils/ad_service.dart';
 import 'screens/splash_screen.dart';
 
 import 'utils/lang_service.dart';
+import 'package:firebase_core/firebase_core.dart';
+// import 'firebase_options.dart'; // Uncomment after running flutterfire configure
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  try {
+    await Firebase.initializeApp(
+      // options: DefaultFirebaseOptions.currentPlatform, // Uncomment after running flutterfire configure
+    );
+    print('Firebase initialized successfully');
+  } catch (e) {
+    print('Firebase initialization error: $e');
+  }
+
   await AdService().init();
   await LangService().init(); // HIGH-PERFORMANCE GLOBAL TRANSLATION SYSTEM
 

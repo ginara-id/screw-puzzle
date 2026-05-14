@@ -1,0 +1,13 @@
+{
+  "name": "heads-up-seeder",
+  "version": "1.0.0",
+  "description": "Script to upload local decks to Firebase Firestore",
+  "main": "upload_decks.js",
+  "scripts": {
+    "start": "node upload_decks.js",
+    "upload-levels": "node upload_levels.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^11.0.0"
+  }
+}

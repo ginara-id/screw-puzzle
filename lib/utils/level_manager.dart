@@ -9,6 +9,7 @@ import '../components/plate_component.dart';
 import '../components/hole_component.dart';
 
 import '../components/industrial_transition.dart';
+import 'firebase_level_service.dart';
 
 class LevelManager {
   final ScrewPuzzleGame game;
@@ -20,17 +21,39 @@ class LevelManager {
     TransitionMode transitionMode = TransitionMode.closeAndOpen,
   }) async {
     final String path = 'assets/levels/level_$levelNumber.json';
-    String content = '';
+    Map<String, dynamic>? data;
+
+    // 1. Try fetching from Firestore first
     try {
-      content = await rootBundle.loadString(path);
+      data = await FirebaseLevelService().fetchLevel(levelNumber);
     } catch (e) {
-      print('Error loading level file: $e');
-      // If file missing, just return to menu or show error
-      game.overlays.add('MainMenu');
-      return;
+      print('Firestore fetch failed for level $levelNumber: $e');
     }
 
-    final dynamic data = jsonDecode(content);
+    // 2. Define validity: Data must exist and contain essential structures
+    bool isFirestoreDataValid = data != null && 
+                                data.containsKey('holes') && 
+                                data.containsKey('bolts') &&
+                                (data['holes'] as List).isNotEmpty;
+
+    // 3. Robust Fallback to local assets if Firestore is empty or invalid
+    if (!isFirestoreDataValid) {
+      try {
+        String content = await rootBundle.loadString(path);
+        data = jsonDecode(content);
+        print('Using local assets fallback for level $levelNumber');
+      } catch (e) {
+        print('Critical error: Local level file missing: $e');
+        game.overlays.add('MainMenu');
+        return;
+      }
+    } else {
+      print('Successfully loaded level $levelNumber from Firestore');
+    }
+
+    // Safety check to ensure data is non-null for the next block
+    if (data == null) return;
+    final Map<String, dynamic> finalData = data;
 
     game.showSteamTransition(
       () async {
@@ -40,11 +63,11 @@ class LevelManager {
         game.clearLevelState();
 
         // 1.5 Load Level-Specific Time Limit (Fallback to 120s if not present in JSON)
-        final num timeFromData = data['timeLimit'] ?? 120.0;
+        final num timeFromData = finalData['timeLimit'] ?? 120.0;
         game.setLevelTimeLimit(timeFromData.toDouble());
 
         // 2. Spawn Holes
-        final holesData = data['holes'] as List;
+        final holesData = finalData['holes'] as List;
         final allHoles = <HoleComponent>[];
 
         for (final Map<String, dynamic> holeData
@@ -63,7 +86,7 @@ class LevelManager {
         }
 
         // 3. Spawn Bolts
-        final boltsData = data['bolts'] as List;
+        final boltsData = finalData['bolts'] as List;
         for (final Map<String, dynamic> boltData
             in boltsData.cast<Map<String, dynamic>>()) {
           final pos = Vector2(
@@ -86,7 +109,7 @@ class LevelManager {
         }
 
         // 4. Spawn Plates
-        final platesData = data['plates'] as List;
+        final platesData = finalData['plates'] as List;
         for (final Map<String, dynamic> pDataMap
             in platesData.cast<Map<String, dynamic>>()) {
           final platePos = Vector2(
