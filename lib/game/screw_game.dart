@@ -67,8 +67,8 @@ class ScrewPuzzleGame extends Forge2DGame {
   bool isHoleBlocked(HoleComponent hole) {
     for (final plate in world.children.whereType<PlateComponent>()) {
       if (plate.isOverlappingCircle(hole.position, hole.radius)) {
-        // Forgiving tolerance allowing slight occlusion (Upgraded from 0.02)
-        if (!plate.isHoleAligned(hole.position, tolerance: 0.25)) {
+        // Strict, realistic tolerance ensuring holes must be almost perfectly aligned (max 20% of radius overlap)
+        if (!plate.isHoleAligned(hole.position, tolerance: 0.08)) {
           return true;
         }
       }
@@ -265,7 +265,7 @@ class ScrewPuzzleGame extends Forge2DGame {
   // COMBO SYSTEM
   double _lastMoveTime = 0;
   int _comboCount = 0;
-  static const double comboWindow = 1.0; // Absolute God-Speed (1 second flat)
+  static const double comboWindow = 2.0; // Mempersingkat jendela kombo menjadi 2.0 detik agar lebih menantang dan dinamis
   
   // AUDIO TRACKING
   int _lastTickSecond = -1;
@@ -276,18 +276,21 @@ class ScrewPuzzleGame extends Forge2DGame {
 
   @override
   void update(double dt) {
-    // 1. Safe Physics Step: Heavily clamped to prevent physics explosion/tunnelling
-    final physicsDt = dt.clamp(0.0, 0.05);
-    // 2. Real-World Clock Step: Permissive clamp allowing accurate 1:1 real-time count 
-    final clockDt = dt.clamp(0.0, 1.0); 
+    // 1. FIXED TIMESTEP ACCUMULATOR:
+    // Decouples physics world steps from variable frame rendering rates.
+    // This removes jerky increments ("deg-deg") and produces fluid, continuous plate motion ("serr")!
+    final clampedDt = dt.clamp(0.0, 0.25);
+    _physicsAccumulator += clampedDt;
 
-    _internalUpdate(physicsDt, clockDt);
-  }
+    int steps = 0;
+    while (_physicsAccumulator >= _fixedTimeStep && steps < 5) {
+      super.update(_fixedTimeStep);
+      _physicsAccumulator -= _fixedTimeStep;
+      steps++;
+    }
 
-  void _internalUpdate(double physicsDt, double clockDt) {
-    // Pass physicsDt to engine for consistent rigid body movement
-    super.update(physicsDt);
-    _lastMoveTime += physicsDt;
+    // 2. REAL-WORLD GAME LOGIC UPDATES:
+    _lastMoveTime += dt;
 
     // Reset combo if idle for too long
     if (_lastMoveTime > comboWindow) {
@@ -298,10 +301,10 @@ class ScrewPuzzleGame extends Forge2DGame {
 
     final isInGame = overlays.isActive('HUD') && !overlays.isActive('MainMenu');
 
-    // --- ABSOLUTE REAL-TIME CLOCK (FIXED!): Subtracts raw wall-clock time ---
+    // --- ABSOLUTE REAL-TIME CLOCK: Subtracts raw wall-clock time ---
     final isTutorialActive = tutorialStepNotifier.value != null;
     if (isInGame && !_isVictoryTriggered && !_isGameOver && !_isTimeFrozen && !isTutorialActive) {
-      _remainingTime -= clockDt; // USES UNCLAMPED REAL-TIME VALUE!
+      _remainingTime -= dt; // USES UNCLAMPED REAL-TIME VALUE!
       if (_remainingTime <= 0) {
         _remainingTime = 0;
         _triggerGameOver();
@@ -317,18 +320,11 @@ class ScrewPuzzleGame extends Forge2DGame {
       } else {
         _lastTickSecond = -1;
       }
-
-      // Pulse feel when low on time
-      if (_remainingTime < 10 && _remainingTime > 0) {
-        if ((_remainingTime * 4).toInt() % 2 == 0) {
-          // HapticFeedback ready
-        }
-      }
     }
 
-    // --- DYNAMIC BOOST FREEZE COUNTDOWN (Frame-Level Engine Controlled!) ---
+    // --- DYNAMIC BOOST FREEZE COUNTDOWN ---
     if (isInGame && _isTimeFrozen && !_isVictoryTriggered && !_isGameOver) {
-      _freezeDurationRemaining -= clockDt;
+      _freezeDurationRemaining -= dt;
       if (_freezeDurationRemaining <= 0) {
         _freezeDurationRemaining = 0;
         _isTimeFrozen = false;
@@ -338,8 +334,8 @@ class ScrewPuzzleGame extends Forge2DGame {
       freezeDurationNotifier.value = _freezeDurationRemaining;
     }
 
-    // --- THROTTLED CHECKS: Everything below here runs every 0.1s for CPU savings ---
-    _victoryCheckTimer += physicsDt;
+    // --- THROTTLED CHECKS: CPU savings throttled check ---
+    _victoryCheckTimer += dt;
     if (_victoryCheckTimer < 0.1) return;
     _victoryCheckTimer = 0;
 
@@ -486,6 +482,17 @@ class ScrewPuzzleGame extends Forge2DGame {
   }
 
   void resetLevel({TransitionMode mode = TransitionMode.closeAndOpen}) {
+    if (!_isVictoryTriggered && !_isGameOver) {
+      triggerInterstitialWithPacing(() {
+        _isVictoryTriggered = false;
+        _isGameOver = false;
+        _clearTimeFreeze();
+        _remainingTime = _levelTimeLimit; // Uses custom time limit from JSON
+        levelManager.loadLevel(currentLevel, transitionMode: mode);
+      });
+      return;
+    }
+
     _isVictoryTriggered = false;
     _isGameOver = false;
     _clearTimeFreeze();
@@ -801,6 +808,7 @@ class ScrewPuzzleGame extends Forge2DGame {
 
       if (!isValidTarget) {
         _activeBolt?.shake(); // Play feedback on selected bolt that they clicked wrong target
+        hole.flashError(); // Squeeze bounce & red flash glow
         return;
       }
     }
@@ -814,7 +822,9 @@ class ScrewPuzzleGame extends Forge2DGame {
     if (_activeBolt == null) return;
 
     if (hole.isOccupied) {
-      _activeBolt?.shake();
+      _activeBolt?.shake(); // Shake active bolt
+      hole.flashError(); // Squeeze bounce & red flash glow
+      audio.playBoltTap();
       return;
     }
 
@@ -823,11 +833,13 @@ class ScrewPuzzleGame extends Forge2DGame {
       // Find the specific plate that's blocking for visual feedback
       for (final plate in world.children.whereType<PlateComponent>()) {
         if (plate.isOverlappingCircle(hole.position, hole.radius) &&
-            !plate.isHoleAligned(hole.position, tolerance: 0.25)) {
+            !plate.isHoleAligned(hole.position, tolerance: 0.08)) {
           plate.flashError();
           break;
         }
       }
+      _activeBolt?.shake(); // Shake active bolt
+      hole.flashError(); // Squeeze bounce & red flash glow
       audio.playBoltTap();
       return;
     } else {
@@ -841,9 +853,10 @@ class ScrewPuzzleGame extends Forge2DGame {
   void _moveBoltToHole(BoltComponent bolt, HoleComponent hole) {
     // 1. Capture the source hole of the CURRENT move
     final sourceHole = _boltToHole[bolt];
+    if (sourceHole == null) return;
 
     // 2. Update hole occupancy state immediately
-    _boltToHole[bolt]?.isOccupied = false;
+    sourceHole.isOccupied = false;
     hole.isOccupied = true;
     _boltToHole[bolt] = hole;
 
@@ -851,60 +864,73 @@ class ScrewPuzzleGame extends Forge2DGame {
     _comboCount++;
     _lastMoveTime = 0.0;
 
-    // --- GENIUS FREEZE MECHANISM ---
-    // Freeze the entire physics simulation by disabling plate bodies during flight.
-    // Prevents unintended falls and eradicates collision CPU overhead during user interaction.
-    final activePlates = world.children.whereType<PlateComponent>().toList();
-    for (final plate in activePlates) {
-      if (plate.isMounted && plate.body.isActive) {
-        plate.body.setActive(false);
+    // 3. CREATE GHOST BODY & GHOST JOINTS AT SOURCE HOLE TO KEEP IT PHYSICALLY LOCKED
+    final ghostBodyDef = BodyDef(
+      position: sourceHole.position,
+      type: BodyType.static,
+    );
+    final ghostBody = world.createBody(ghostBodyDef);
+    final ghostJoints = <RevoluteJoint>[];
+
+    final activeJoints = _boltJoints[bolt];
+    if (activeJoints != null) {
+      for (final joint in List<RevoluteJoint>.from(activeJoints)) {
+        final otherBody = joint.bodyB;
+        world.destroyJoint(joint);
+
+        final ghostJointDef = RevoluteJointDef()
+          ..initialize(ghostBody, otherBody, sourceHole.position)
+          ..collideConnected = false;
+        final ghostJoint = RevoluteJoint(ghostJointDef);
+        world.createJoint(ghostJoint);
+        ghostJoints.add(ghostJoint);
+      }
+      _boltJoints.remove(bolt);
+    }
+
+    // 4. TELEPORT ORIGINAL BOLT TO DESTINATION HOLE IMMEDIATELY
+    final targetPos = hole.position;
+    bolt.body.setTransform(targetPos, bolt.body.angle);
+    bolt.body.setType(BodyType.static);
+
+    // 5. CREATE NEW JOINTS AT DESTINATION HOLE IMMEDIATELY (LOCKS DESTINATION INSTANTLY)
+    for (final plate in world.children.whereType<PlateComponent>()) {
+      final localPoint = plate.body.localPoint(targetPos);
+      if (plate.containsLocalPoint(localPoint)) {
+        if (plate.isHoleAligned(targetPos, tolerance: 0.12)) {
+          createJoint(bolt, plate);
+        }
       }
     }
 
+    // 6. ANIMATE VISUAL FLIGHT FROM SOURCE TO DESTINATION
     bolt.moveTo(
-      hole.position,
+      targetPos,
+      sourceHole.position,
       onComplete: () {
-        // --- UNFREEZE MECHANISM ---
-        // Restore physics world simulation immediately upon bolt arrival.
-        for (final plate in activePlates) {
-          if (plate.isMounted) {
-            plate.body.setActive(true);
-            plate.body.setAwake(
-              true,
-            ); // Re-wake instantly to resume natural motion
+        // A. DESTROY GHOST AT SOURCE TO FINALLY RELEASE THE SOURCE PHYSICS
+        final affectedPlates = <PlateComponent>{};
+        for (final joint in ghostJoints) {
+          final otherBody = joint.bodyB;
+          if (otherBody.userData is PlateComponent) {
+            final plate = otherBody.userData as PlateComponent;
+            affectedPlates.add(plate);
+            plate.showSparks(sourceHole.position);
           }
+          world.destroyJoint(joint);
+        }
+        world.destroyBody(ghostBody);
+
+        // B. RE-EVALUATE GRAVITY FOR AFFECTED PLATES AT SOURCE
+        for (final plate in affectedPlates) {
+          _updatePlateGravity(plate);
         }
 
-        // 3. Check if this target hole is where the bolt came from in the PREVIOUS move
-        final isBackAndForth = bolt.previousHole == hole;
-
-        // Check if the move is meaningful (released or pinned a plate)
-        final wasHoldingPlate = _boltJoints[bolt]?.isNotEmpty ?? false;
-
-        _releaseBolt(bolt, withNudge: false);
+        // C. PLAY AUDIO AND PARTICLES
         audio.playDropScrew();
         createSparks(hole.position);
 
-        final targetPos = hole.position;
-        bolt.body.setTransform(targetPos, 0);
-        bolt.body.setType(BodyType.static);
-
-        bool isNowHoldingPlate = false;
-        for (final plate in world.children.whereType<PlateComponent>()) {
-          final localPoint = plate.body.localPoint(targetPos);
-          if (plate.containsLocalPoint(localPoint)) {
-            if (plate.isHoleAligned(targetPos)) {
-              createJoint(bolt, plate);
-              isNowHoldingPlate = true;
-            }
-          }
-        }
-
-
-        // --- LEGACY COMBO LOGIC REMOVED FROM HERE TO FIX THE DOUBLE-INCREMENT BUG ---
-        // Combo now increments instantly upon valid tap rather than waiting for travel end.
-
-        // NOW update the history: The source of THIS move is now the "previous" for the NEXT move
+        // D. UPDATE MOVE HISTORY
         bolt.previousHole = sourceHole;
         _lastMoveTime = 0;
         bolt.isLifted = false;
@@ -922,7 +948,7 @@ class ScrewPuzzleGame extends Forge2DGame {
           overlays.remove('Tutorial');
         }
 
-        // 6. Fail Check - Is the game deadlocked?
+        // E. Fail Check - Is the game deadlocked?
         _checkFailCondition();
       },
     );
@@ -1060,9 +1086,20 @@ class ScrewPuzzleGame extends Forge2DGame {
           }
         }
 
-        // If we found a hole within reasonable distance, snap the anchor to its WORLD center
+        // If we found a hole within reasonable distance, snap the plate body so the hole centers align perfectly!
+        // This eliminates any initial overlap/penetration and guarantees 0% physics jitter.
+        // BUT ONLY IF the plate is free (0 active joints) to prevent violating other joint constraints!
         if (minDist < 0.8) {
-          anchor = plate.body.worldPoint(bestHole);
+          final currentWorldHolePos = plate.body.worldPoint(bestHole);
+          if (_plateJointCount(plate) == 0) {
+            final alignmentOffset = anchor - currentWorldHolePos;
+            plate.body.setTransform(plate.body.position + alignmentOffset, plate.body.angle);
+            anchor = plate.body.worldPoint(bestHole);
+          } else {
+            // Already held by other joints, anchor precisely at the bolt's center
+            // to prevent shifting the plate and violating existing joints!
+            anchor = bolt.body.position;
+          }
         }
       }
     } catch (e) {

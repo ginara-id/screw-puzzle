@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import 'package:flame_audio/flame_audio.dart';
 import '../main.dart';
+import '../utils/firebase_level_service.dart';
 
 enum SplashSequence {
   studioIntro, // 0 - 2.5s: Showing Eamon
@@ -81,6 +82,10 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
       setState(() {
         _currentSequence = SplashSequence.gameIntro;
       });
+
+      // Preload all levels asynchronously in the background during the cinematic loading bar!
+      FirebaseLevelService().preloadAllLevels();
+
       // Fire the heavy machinery startup audio!
       FlameAudio.play('machine.mp3', volume: 0.85).then((player) {
         // Run the visual loading bar at its intended cinematic speed (4 seconds)
@@ -196,10 +201,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                 tween: Tween(begin: 0, end: 1),
                 duration: const Duration(milliseconds: 1200),
                 curve: Curves.easeOut,
-                builder: (context, fade, _) => Opacity(
-                  opacity: fade,
-                  child: _buildModernLoader(),
-                ),
+                builder: (context, fade, _) => _buildModernLoader(fade),
               ),
             ),
         ],
@@ -218,19 +220,18 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
             child: Stack(
               alignment: Alignment.center,
               children: [
-                // Soft Studio Cyan Glow
+                // Soft Studio Cyan Glow using GPU-optimized RadialGradient instead of expensive BoxShadow
                 Container(
                   width: 220,
                   height: 120,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF00E5FF).withOpacity(0.15 * pulse),
-                        blurRadius: 50 + (20 * pulse),
-                        spreadRadius: 5,
-                      ),
-                    ],
+                    gradient: RadialGradient(
+                      colors: [
+                        const Color(0xFF00E5FF).withOpacity(0.25 * pulse),
+                        Colors.transparent,
+                      ],
+                    ),
                   ),
                 ),
                 Image.asset(
@@ -262,19 +263,18 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
             child: Stack(
               alignment: Alignment.center,
               children: [
-                // Intense Furnace Backlight for the user logo
+                // Intense Furnace Backlight using GPU-optimized RadialGradient instead of expensive BoxShadow
                 Container(
                   width: 300,
                   height: 300,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFFF3D00).withOpacity(0.2 * pulse),
-                        blurRadius: 60 + (30 * pulse),
-                        spreadRadius: 10,
-                      ),
-                    ],
+                    gradient: RadialGradient(
+                      colors: [
+                        const Color(0xFFFF3D00).withOpacity(0.35 * pulse),
+                        Colors.transparent,
+                      ],
+                    ),
                   ),
                 ),
                 // THE USER GORGEOUS LOGO ASSET
@@ -305,7 +305,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     );
   }
 
-  Widget _buildModernLoader() {
+  Widget _buildModernLoader(double fade) {
     return AnimatedBuilder(
       animation: _loadingController,
       builder: (context, _) {
@@ -322,8 +322,8 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
           children: [
             Text(
               status,
-              style: const TextStyle(
-                color: Color(0xFFFFD180),
+              style: TextStyle(
+                color: const Color(0xFFFFD180).withOpacity(fade),
                 fontSize: 11,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 2.5,
@@ -335,18 +335,21 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
               width: 260,
               height: 6,
               decoration: BoxDecoration(
-                color: Colors.black,
+                color: Colors.black.withOpacity(fade),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.white10, width: 1),
+                border: Border.all(color: Colors.white.withOpacity(0.1 * fade), width: 1),
               ),
               clipBehavior: Clip.antiAlias,
               child: FractionallySizedBox(
                 alignment: Alignment.centerLeft,
                 widthFactor: _loadingController.value,
                 child: Container(
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [Color(0xFFD84315), Color(0xFFFFB300)],
+                      colors: [
+                        const Color(0xFFD84315).withOpacity(fade),
+                        const Color(0xFFFFB300).withOpacity(fade),
+                      ],
                     ),
                   ),
                 ),
@@ -355,8 +358,8 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
             const SizedBox(height: 8),
             Text(
               '$pct%',
-              style: const TextStyle(
-                color: Colors.white24,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.24 * fade),
                 fontSize: 10,
                 fontFamily: 'monospace',
                 fontWeight: FontWeight.bold,

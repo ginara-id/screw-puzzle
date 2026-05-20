@@ -64,22 +64,45 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
        super(renderBody: false);
 
   void shake() {
-    add(
+    if (_visualOffset.parent == null) add(_visualOffset);
+    // Remove any running shake effects on _visualOffset to prevent conflicts
+    _visualOffset.children.whereType<Effect>().forEach((e) => e.removeFromParent());
+    _visualOffset.add(
       SequenceEffect([
         MoveByEffect(
-          Vector2(0.05, 0),
+          Vector2(0.06, 0.0),
           EffectController(
-            duration: 0.05,
-            reverseDuration: 0.05,
+            duration: 0.03,
+            reverseDuration: 0.03,
             repeatCount: 1,
+            curve: Curves.easeOut,
           ),
         ),
         MoveByEffect(
-          Vector2(-0.05, 0),
+          Vector2(-0.06, 0.0),
           EffectController(
-            duration: 0.05,
-            reverseDuration: 0.05,
+            duration: 0.03,
+            reverseDuration: 0.03,
             repeatCount: 1,
+            curve: Curves.easeOut,
+          ),
+        ),
+        MoveByEffect(
+          Vector2(0.03, 0.0),
+          EffectController(
+            duration: 0.02,
+            reverseDuration: 0.02,
+            repeatCount: 1,
+            curve: Curves.easeOut,
+          ),
+        ),
+        MoveByEffect(
+          Vector2(-0.03, 0.0),
+          EffectController(
+            duration: 0.02,
+            reverseDuration: 0.02,
+            repeatCount: 1,
+            curve: Curves.easeOut,
           ),
         ),
       ]),
@@ -315,34 +338,32 @@ class BoltComponent extends BodyComponent<ScrewPuzzleGame>
     game.onBoltTapped(this);
   }
 
-  void moveTo(Vector2 target, {VoidCallback? onComplete}) {
+  void moveTo(Vector2 target, Vector2 source, {VoidCallback? onComplete}) {
     isLifted = true;
     _updateCollision(false);
 
-    // Calculate the total distance we need to visually travel from our CURRENT physics body
-    final targetOffset = target - body.position;
+    // Since the physics body is already teleported to target immediately,
+    // the visual offset begins at (source - target) and animates to zero (which represents the target).
+    final targetOffset = source - target;
 
-    // Reset visual offset to zero (start)
-    _visualOffset.position = Vector2.zero();
+    // Reset visual offset to start position
+    _visualOffset.position = targetOffset;
 
     // Ensure the visual offset component is added
     if (_visualOffset.parent == null) add(_visualOffset);
 
-    // Animate the visual offset from (0,0) to the target hole
+    // Clear any previous animations on _visualOffset
+    _visualOffset.children.whereType<Effect>().forEach((e) => e.removeFromParent());
+
+    // Animate the visual offset from targetOffset to (0,0) (which is the target hole)
     _visualOffset.add(
       MoveToEffect(
-        targetOffset,
-        EffectController(duration: 0.2, curve: Curves.easeOutQuad),
+        Vector2.zero(),
+        EffectController(duration: 0.25, curve: Curves.easeOutQuad),
         onComplete: () {
-          // SEAMLESS HANDOVER:
-          // 1. Teleport the physics body to the target hole
-          // Keep the current rotation to avoid snapping
-          body.setTransform(target, body.angle);
-
-          // 2. Reset the visual offset to zero
+          // Reset the visual offset to zero just to be completely safe
           _visualOffset.position = Vector2.zero();
 
-          // 3. Finalize
           _updateCollision(true);
           isLifted = false;
           if (onComplete != null) onComplete();

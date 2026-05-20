@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 import 'package:flame/effects.dart';
@@ -10,13 +11,38 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'lang_service.dart';
 import 'firebase_level_service.dart';
+import 'audio_service.dart';
 
-class WinMenu extends StatelessWidget {
+class WinMenu extends StatefulWidget {
   final ScrewPuzzleGame game;
   const WinMenu({super.key, required this.game});
 
   @override
+  State<WinMenu> createState() => _WinMenuState();
+}
+
+class _WinMenuState extends State<WinMenu> {
+  late bool _showIntro;
+
+  @override
+  void initState() {
+    super.initState();
+    // Animasi hanya dipicu jika pengguna menyelesaikan level tertinggi yang dimilikinya
+    _showIntro = widget.game.currentLevel == widget.game.highestUnlockedLevel;
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_showIntro) {
+      return NewLevelUnlockIntro(
+        game: widget.game,
+        onFinished: () {
+          widget.game.overlays.remove('WinMenu');
+          widget.game.nextLevel();
+        },
+      );
+    }
+
     return Stack(
       children: [
         // Efficient Semi-Transparent Overlay (Zero GPU Cost)
@@ -99,8 +125,8 @@ class WinMenu extends StatelessWidget {
                           label: LangService.t('win_next'),
                           icon: Icons.double_arrow_rounded,
                           onPressed: () {
-                            game.overlays.remove('WinMenu');
-                            game.nextLevel();
+                            widget.game.overlays.remove('WinMenu');
+                            widget.game.nextLevel();
                           },
                         ),
                       ],
@@ -189,6 +215,881 @@ class _RivetWidget extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class NewLevelUnlockIntro extends StatefulWidget {
+  final ScrewPuzzleGame game;
+  final VoidCallback onFinished;
+
+  const NewLevelUnlockIntro({
+    super.key,
+    required this.game,
+    required this.onFinished,
+  });
+
+  @override
+  State<NewLevelUnlockIntro> createState() => _NewLevelUnlockIntroState();
+}
+
+class _NewLevelUnlockIntroState extends State<NewLevelUnlockIntro>
+    with TickerProviderStateMixin {
+  late AnimationController _controller; // Ledakan partikel & shockwave setelah unlock
+  late AnimationController _physicsController; // Loop fisika 60 FPS
+  
+  late List<_UnlockParticle> _particles;
+
+  bool _isUnlocked = false;
+  bool _soundPlayed = false;
+  bool _isSkipped = false;
+
+  // Pelacakan Drag
+  bool _isDragging = false;
+  double _dragStart = 0.0;
+  double _dragOffset = 0.0;
+  double _dragVelocity = 0.0;
+
+  // Pelacakan Hovering sinusoidal
+  double _idleTime = 0.0;
+  double _idleY = 0.0;
+
+  // Efek guncangan/shake jika ditarik
+  double _shakeOffset = 0.0;
+  double _shakeTime = 0.0;
+
+  // Efek teks instruksi / peringatan
+  String _hintText = "SERET GEMBOK KE BAWAH UNTUK MEMBUKA!";
+  Color _hintColor = const Color(0xFF00E5FF);
+  double _hintPulse = 1.0;
+
+  double _lastFrameTime = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    
+    // Controller ledakan partikel setelah unlock
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2500),
+    );
+
+    // Physics Loop 60 FPS
+    _physicsController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 1),
+    )..addListener(_updatePhysics)..repeat();
+
+    // Inisialisasi partikel secara deterministik agar cepat & stabil
+    final random = math.Random(42);
+    _particles = List.generate(50, (index) {
+      final angle = random.nextDouble() * 2 * math.pi;
+      final speed = 150.0 + random.nextDouble() * 250.0;
+      final size = 2.5 + random.nextDouble() * 4.5;
+      final isSpark = random.nextDouble() > 0.35;
+      return _UnlockParticle(
+        angle: angle,
+        speed: speed,
+        size: size,
+        isSpark: isSpark,
+        color: isSpark
+            ? (random.nextDouble() > 0.5 ? const Color(0xFFFFD700) : const Color(0xFFFF9800))
+            : const Color(0xFF00E5FF), // cyan/white spark
+      );
+    });
+
+    _controller.addListener(() {
+      final progress = _controller.value;
+      if (progress >= 0.05 && !_soundPlayed) {
+        _soundPlayed = true;
+        widget.game.audio.playGateOpen();
+        widget.game.audio.playLightningStrike();
+      }
+    });
+
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _physicsController.dispose();
+    super.dispose();
+  }
+
+  void _updatePhysics() {
+    final double currentTime = DateTime.now().millisecondsSinceEpoch / 1000.0;
+    if (_lastFrameTime == 0.0) {
+      _lastFrameTime = currentTime;
+      return;
+    }
+    final double dt = (currentTime - _lastFrameTime).clamp(0.0, 0.03);
+    _lastFrameTime = currentTime;
+
+    bool changed = false;
+
+    // 1. Guncangan gembok (shake)
+    if (_shakeTime > 0.0) {
+      _shakeTime -= dt * 5.0;
+      _shakeOffset = math.sin(_shakeTime * 10 * math.pi) * 6.0;
+      if (_shakeTime <= 0.0) {
+        _shakeOffset = 0.0;
+      }
+      changed = true;
+    }
+
+    // 2. Hovering sinusoidal gembok
+    if (!_isDragging && !_isUnlocked) {
+      _idleTime += dt * 3.0;
+      _idleY = math.sin(_idleTime) * 4.5;
+      changed = true;
+    }
+
+    // 3. Fisika Pemulihan Pegas Gembok (jika dilepas sebelum 60px)
+    if (!_isDragging && _dragOffset > 0.0 && !_isUnlocked) {
+      _dragVelocity -= 450.0 * _dragOffset * dt; // F = -kx (gaya pemulih pegas kuat)
+      _dragVelocity *= math.exp(-8.0 * dt); // redaman cepat
+      _dragOffset += _dragVelocity * dt;
+      if (_dragOffset.abs() < 0.2) {
+        _dragOffset = 0.0;
+        _dragVelocity = 0.0;
+      }
+      changed = true;
+    }
+
+    // 4. Pulsasi teks petunjuk
+    _hintPulse = 1.0 + math.sin(currentTime * 4.0) * 0.15;
+    changed = true;
+
+    if (changed && mounted) {
+      setState(() {});
+    }
+  }
+
+  void _onDragStart(DragStartDetails details) {
+    if (_isUnlocked) return;
+    _isDragging = true;
+    _dragStart = details.localPosition.dy;
+  }
+
+  void _onDragUpdate(DragUpdateDetails details) {
+    if (!_isDragging || _isUnlocked) return;
+
+    final dy = details.localPosition.dy - _dragStart;
+    final prevOffset = _dragOffset;
+    _dragOffset = dy.clamp(0.0, 110.0);
+
+    if ((_dragOffset - prevOffset).abs() > 4.0) {
+      HapticFeedback.selectionClick();
+    }
+  }
+
+  void _onDragEnd(DragEndDetails details) {
+    if (!_isDragging || _isUnlocked) return;
+    _isDragging = false;
+
+    if (_dragOffset >= 60.0) {
+      _triggerUnlock();
+    } else {
+      _dragVelocity = -350.0; // kecepatan dorong awal ke atas
+      widget.game.audio.playBoltSnap();
+      HapticFeedback.mediumImpact();
+    }
+  }
+
+  void _triggerUnlock() {
+    setState(() {
+      _isUnlocked = true;
+      _dragOffset = 60.0;
+      _hintText = "AKSES SEKTOR DIIZINKAN!";
+      _hintColor = Colors.greenAccent;
+    });
+
+    HapticFeedback.heavyImpact();
+    _controller.forward(from: 0.0);
+  }
+
+  void _skipIntro() {
+    if (_isSkipped) return;
+    _isSkipped = true;
+    widget.onFinished();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final newLevel = widget.game.currentLevel + 1;
+    const allBoltsReleased = true;
+
+    return Stack(
+      children: [
+        // Latar belakang premium fiksi ilmiah gelap gulita
+        Positioned.fill(
+          child: Container(
+            decoration: const BoxDecoration(
+              gradient: RadialGradient(
+                colors: [
+                  Color(0xFF140F08),
+                  Color(0xFF060606),
+                ],
+                center: Alignment.center,
+                radius: 1.3,
+              ),
+            ),
+          ),
+        ),
+
+        // Grid, Partikel, Aura, & Cincin Holografik
+        Positioned.fill(
+          child: CustomPaint(
+            painter: _UnlockIntroPainter(
+              progress: _controller.value,
+              particles: _particles,
+              isUnlocked: _isUnlocked,
+              allBoltsReleased: allBoltsReleased,
+              dragOffset: _dragOffset,
+              idleY: _idleY,
+              shakeOffset: _shakeOffset,
+            ),
+          ),
+        ),
+
+        // Elemen Teks dan Tombol
+        Positioned.fill(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Judul Transisi Mewah
+              Opacity(
+                opacity: _isUnlocked ? ((_controller.value - 0.1) / 0.3).clamp(0.0, 1.0) : 0.8,
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: _hintColor.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: _hintColor.withOpacity(0.35),
+                          width: 1.2,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _isUnlocked ? Icons.lock_open_rounded : Icons.lock_outline_rounded,
+                            color: _hintColor,
+                            size: 14,
+                          ),
+                          const SizedBox(width: 8),
+                          AnimatedScale(
+                            scale: _hintPulse,
+                            duration: const Duration(milliseconds: 150),
+                            child: Text(
+                              _hintText,
+                              style: TextStyle(
+                                color: _hintColor,
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 2,
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'NEW SECTOR INTRUSION',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 6.0,
+                        fontFamily: 'Courier',
+                        shadows: [
+                          Shadow(color: Colors.white12, blurRadius: 8),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 35),
+
+              // Area Interaktif Puzzle Gembok 250x250 (Hanya Drag Vertikal)
+              GestureDetector(
+                onVerticalDragStart: _onDragStart,
+                onVerticalDragUpdate: _onDragUpdate,
+                onVerticalDragEnd: _onDragEnd,
+                behavior: HitTestBehavior.opaque,
+                child: const SizedBox(
+                  width: 250,
+                  height: 250,
+                ),
+              ),
+
+              const SizedBox(height: 35),
+
+              // Akses Level Status di Bawah
+              Opacity(
+                opacity: _isUnlocked ? (_controller.value / 0.4).clamp(0.0, 1.0) : 0.0,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 44),
+                  child: Column(
+                    children: [
+                      Text(
+                        'ACCESS GRANTED TO SECTOR #$newLevel.',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Color(0xFFFFB300),
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 2.5,
+                          fontFamily: 'Courier',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'ALL CORRESPONDING BOLTS DECRYPTED. LOCK SYSTEM FLUSHED SUCCESSFULLY.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.grey[500],
+                          fontSize: 10,
+                          height: 1.4,
+                          letterSpacing: 1.2,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 50),
+
+              // Tombol Enter Sector yang menyala dan opsi menu tambahan (Replay / Home / Next)
+              Opacity(
+                opacity: _isUnlocked ? ((_controller.value - 0.4) / 0.3).clamp(0.0, 1.0) : 0.0,
+                child: _isUnlocked
+                    ? Transform.translate(
+                        offset: Offset(0.0, 15.0 * (1.0 - ((_controller.value - 0.4) / 0.3).clamp(0.0, 1.0))),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // 1. Tombol Utama: SEKTOR BERIKUTNYA
+                            Container(
+                              width: 260,
+                              height: 52,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(26),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFFFF9800).withOpacity(0.25),
+                                    blurRadius: 12,
+                                    spreadRadius: 1,
+                                  ),
+                                ],
+                              ),
+                              child: ElevatedButton(
+                                onPressed: _skipIntro,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFFF9800),
+                                  foregroundColor: Colors.black,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(26),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      LangService.t('win_next'),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 14,
+                                        letterSpacing: 2.5,
+                                        fontFamily: 'Courier',
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Icon(Icons.arrow_forward_rounded, size: 18),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            // 2. Tombol Sekunder Row: REPLAY & HOME
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                _buildSecondaryButton(
+                                  label: LangService.t('win_replay'),
+                                  icon: Icons.refresh_rounded,
+                                  borderColor: const Color(0xFFFF9800).withOpacity(0.4),
+                                  onPressed: () {
+                                    widget.game.overlays.remove('WinMenu');
+                                    widget.game.resetLevel(mode: TransitionMode.openOnly);
+                                  },
+                                ),
+                                const SizedBox(width: 12),
+                                _buildSecondaryButton(
+                                  label: LangService.t('win_menu'),
+                                  icon: Icons.home_rounded,
+                                  borderColor: Colors.white.withOpacity(0.2),
+                                  onPressed: () {
+                                    widget.game.overlays.remove('WinMenu');
+                                    widget.game.overlays.add('MainMenu');
+                                    widget.game.audio.playMenuBGM();
+                                  },
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSecondaryButton({
+    required String label,
+    required IconData icon,
+    required Color borderColor,
+    required VoidCallback onPressed,
+  }) {
+    return Container(
+      height: 44,
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E1E).withOpacity(0.8),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: borderColor, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          foregroundColor: Colors.white,
+          shadowColor: Colors.transparent,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: Colors.white70),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 11,
+                letterSpacing: 1.5,
+                fontFamily: 'Courier',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _UnlockParticle {
+  final double angle;
+  final double speed;
+  final double size;
+  final bool isSpark;
+  final Color color;
+
+  _UnlockParticle({
+    required this.angle,
+    required this.speed,
+    required this.size,
+    required this.isSpark,
+    required this.color,
+  });
+}
+
+class _UnlockIntroPainter extends CustomPainter {
+  final double progress;
+  final List<_UnlockParticle> particles;
+  final bool isUnlocked;
+  final bool allBoltsReleased;
+  final double dragOffset;
+  final double idleY;
+  final double shakeOffset;
+
+  // Optimasi performa: satu Paint re-usable
+  final Paint _paint = Paint();
+
+  _UnlockIntroPainter({
+    required this.progress,
+    required this.particles,
+    required this.isUnlocked,
+    required this.allBoltsReleased,
+    required this.dragOffset,
+    required this.idleY,
+    required this.shakeOffset,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2.0, size.height / 2.0);
+
+    // 1. Gambar grid latar belakang fiksi ilmiah tipis
+    _paintSciFiGrid(canvas, size);
+
+    // Hitung kemajuan animasi cincin
+    final double rotProgress = isUnlocked ? 0.25 + progress * 0.75 : 0.05;
+    final rotation1 = rotProgress * 2.0 * math.pi * 0.5;
+    final rotation2 = -rotProgress * 2.0 * math.pi * 0.7;
+
+    // 2. Gambar Cincin Holografik Luar (Dashed)
+    _paintHolographicRing(
+      canvas,
+      center,
+      radius: 110.0,
+      rotation: rotation1,
+      dashCount: 24,
+      dashLength: 8.0,
+      color: const Color(0xFFFF9800).withOpacity(0.2 * (1.0 - progress * 0.4)),
+      strokeWidth: 1.5,
+    );
+
+    // 3. Gambar Cincin Holografik Dalam (Dashed tebal)
+    _paintHolographicRing(
+      canvas,
+      center,
+      radius: 95.0,
+      rotation: rotation2,
+      dashCount: 12,
+      dashLength: 20.0,
+      color: (allBoltsReleased ? const Color(0xFF00E5FF) : const Color(0xFFFFD700))
+          .withOpacity(0.35 * (1.0 - progress * 0.5)),
+      strokeWidth: 2.5,
+    );
+
+    // 4. Gambar Teks Level Menyala di Belakang Gembok
+    _paintLevelText(canvas, center);
+
+    // 5. Gambar Aura Denyut Neon Hijau/Cyan ketika kunci siap dibuka
+    if (allBoltsReleased && !isUnlocked) {
+      final pulse = 0.5 + 0.5 * math.sin(DateTime.now().millisecondsSinceEpoch / 180.0);
+      _paint.style = PaintingStyle.stroke;
+      _paint.strokeWidth = 2.0 + pulse * 4.0;
+      _paint.color = const Color(0xFF00E5FF).withOpacity(0.12 * (1.0 - pulse * 0.3));
+      _paint.maskFilter = MaskFilter.blur(BlurStyle.normal, 8.0 + pulse * 6.0);
+      canvas.drawCircle(center + Offset(0.0, dragOffset + idleY + shakeOffset), 55.0, _paint);
+      _paint.maskFilter = null; // reset
+    }
+
+    // 6. Gambar Gelombang Kejut Radial (Shockwave) setelah meletup
+    if (isUnlocked && progress > 0.0) {
+      final tShock = progress / 0.35; // Shockwave berkembang cepat dalam 35% pertama
+      if (tShock <= 1.0) {
+        final shockRadius = 60.0 + tShock * 180.0;
+        final shockOpacity = 1.0 - tShock;
+        _paint.style = PaintingStyle.stroke;
+        _paint.strokeWidth = 2.0 + (1.0 - tShock) * 7.0;
+        _paint.shader = RadialGradient(
+          colors: [
+            const Color(0xFF00E5FF).withOpacity(0.0),
+            const Color(0xFFFFD700).withOpacity(shockOpacity * 0.6),
+            const Color(0xFFFFFFFF).withOpacity(shockOpacity * 0.95),
+          ],
+          stops: const [0.65, 0.85, 1.0],
+        ).createShader(Rect.fromCircle(center: center, radius: shockRadius));
+
+        canvas.drawCircle(center, shockRadius, _paint);
+        _paint.shader = null;
+      }
+    }
+
+    // 7. Gambar Partikel Ledakan
+    if (isUnlocked && progress > 0.0) {
+      final tPart = progress;
+      _paint.style = PaintingStyle.fill;
+
+      for (final p in particles) {
+        final dist = p.speed * (1.0 - math.exp(-4.5 * tPart)) / 4.5;
+        final px = center.dx + math.cos(p.angle) * dist;
+        final py = center.dy + math.sin(p.angle) * dist;
+
+        final opacity = (1.0 - tPart).clamp(0.0, 1.0);
+        _paint.color = p.color.withOpacity(opacity);
+
+        if (p.isSpark) {
+          final size = p.size;
+          final path = Path()
+            ..moveTo(px, py - size)
+            ..lineTo(px + size, py)
+            ..lineTo(px, py + size)
+            ..lineTo(px - size, py)
+            ..close();
+          canvas.drawPath(path, _paint);
+        } else {
+          canvas.drawCircle(Offset(px, py), p.size, _paint);
+        }
+      }
+    }
+
+    // 8. Gambar Gembok Mekanis Emas Kustom
+    _paintInteractivePadlock(canvas, center);
+  }
+
+  void _paintSciFiGrid(Canvas canvas, Size size) {
+    _paint.color = const Color(0xFFFF9800).withOpacity(0.035);
+    _paint.style = PaintingStyle.stroke;
+    _paint.strokeWidth = 0.5;
+
+    const spacing = 36.0;
+    for (double x = 0.0; x < size.width; x += spacing) {
+      canvas.drawLine(Offset(x, 0.0), Offset(x, size.height), _paint);
+    }
+    for (double y = 0.0; y < size.height; y += spacing) {
+      canvas.drawLine(Offset(0.0, y), Offset(size.width, y), _paint);
+    }
+  }
+
+  void _paintHolographicRing(
+    Canvas canvas,
+    Offset center, {
+    required double radius,
+    required double rotation,
+    required int dashCount,
+    required double dashLength,
+    required Color color,
+    required double strokeWidth,
+  }) {
+    _paint.color = color;
+    _paint.style = PaintingStyle.stroke;
+    _paint.strokeWidth = strokeWidth;
+
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(rotation);
+
+    final angleStep = 2.0 * math.pi / dashCount;
+    final dashAngle = dashLength / radius;
+
+    for (int i = 0; i < dashCount; i++) {
+      final startAngle = i * angleStep;
+      canvas.drawArc(
+        Rect.fromCircle(center: Offset.zero, radius: radius),
+        startAngle,
+        dashAngle,
+        false,
+        _paint,
+      );
+    }
+    canvas.restore();
+  }
+
+  void _paintLevelText(Canvas canvas, Offset center) {
+    final textSpan = TextSpan(
+      text: 'SECTOR ACCESS',
+      style: TextStyle(
+        color: Colors.white.withOpacity(0.12),
+        fontSize: 18,
+        fontWeight: FontWeight.w900,
+        letterSpacing: 4.0,
+        fontFamily: 'Courier',
+      ),
+    );
+    final textPainter = TextPainter(
+      text: textSpan,
+      textDirection: TextDirection.ltr,
+    )..layout();
+    textPainter.paint(
+      canvas,
+      center - Offset(textPainter.width / 2.0, 60.0),
+    );
+  }
+
+  void _paintInteractivePadlock(Canvas canvas, Offset center) {
+    double opacity = 1.0;
+    if (isUnlocked) {
+      opacity = (1.0 - progress / 0.5).clamp(0.0, 1.0);
+    }
+    if (opacity <= 0.0) return;
+
+    final double gembokY = dragOffset + idleY + shakeOffset;
+
+    double shackleOffset = 0.0;
+    double shackleRotation = 0.0;
+    double shackleXOffset = 0.0;
+
+    if (isUnlocked) {
+      final tOpen = (progress / 0.3).clamp(0.0, 1.0);
+      shackleOffset = -22.0 - tOpen * 50.0;
+      shackleRotation = -0.15 * tOpen * math.pi;
+      shackleXOffset = -10.0 * tOpen;
+    } else {
+      shackleOffset = -gembokY * 0.35;
+    }
+
+    canvas.save();
+    canvas.translate(center.dx, center.dy + gembokY);
+
+    double scale = 1.0;
+    if (isUnlocked) {
+      final tOpen = (progress / 0.3).clamp(0.0, 1.0);
+      scale = 1.0 + 0.15 * math.sin(tOpen * math.pi);
+    }
+    canvas.scale(scale);
+
+    // 1. Gambar Shackle
+    canvas.save();
+    canvas.translate(shackleXOffset, shackleOffset);
+    canvas.rotate(shackleRotation);
+
+    _paint.style = PaintingStyle.stroke;
+    _paint.strokeWidth = 9.5;
+    _paint.strokeCap = StrokeCap.round;
+    _paint.color = Colors.white;
+
+    _paint.shader = LinearGradient(
+      colors: [
+        const Color(0xFF78909C).withOpacity(opacity),
+        const Color(0xFFECEFF1).withOpacity(opacity),
+        const Color(0xFF455A64).withOpacity(opacity),
+      ],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    ).createShader(Rect.fromLTRB(-35.0, -65.0, 35.0, -15.0));
+
+    final shacklePath = Path()
+      ..moveTo(-28.0, -8.0)
+      ..lineTo(-28.0, -38.0)
+      ..arcTo(
+        Rect.fromCircle(center: const Offset(0.0, -38.0), radius: 28.0),
+        math.pi,
+        math.pi,
+        false,
+      )
+      ..lineTo(28.0, -8.0);
+
+    canvas.drawPath(shacklePath, _paint);
+    _paint.shader = null;
+    canvas.restore();
+
+    // 2. Gambar Badan Gembok Emas
+    final bodyRect = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: const Offset(0.0, 15.0), width: 80.0, height: 64.0),
+      const Radius.circular(12.0),
+    );
+
+    _paint.style = PaintingStyle.fill;
+    _paint.shader = LinearGradient(
+      colors: [
+        (allBoltsReleased ? const Color(0xFFB2FF59) : const Color(0xFFFFD54F)).withOpacity(opacity),
+        (allBoltsReleased ? const Color(0xFF00E5FF) : const Color(0xFFFF8F00)).withOpacity(opacity),
+        const Color(0xFF4E342E).withOpacity(opacity),
+      ],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    ).createShader(Rect.fromCenter(center: const Offset(0.0, 15.0), width: 80.0, height: 64.0));
+
+    _paint.shader = null;
+    _paint.color = Colors.black.withOpacity(0.4 * opacity);
+    _paint.style = PaintingStyle.fill;
+    _paint.maskFilter = const MaskFilter.blur(BlurStyle.normal, 6.0);
+    canvas.drawRRect(bodyRect.shift(const Offset(0.0, 4.0)), _paint);
+    _paint.maskFilter = null;
+
+    canvas.drawRRect(bodyRect, _paint);
+    _paint.shader = null;
+
+    _paint.color = (allBoltsReleased ? const Color(0xFF00E5FF) : const Color(0xFF5D4037)).withOpacity(opacity);
+    _paint.style = PaintingStyle.stroke;
+    _paint.strokeWidth = 2.0;
+    canvas.drawRRect(bodyRect, _paint);
+
+    // 3. Pelat Pelindung Tengah
+    final plateRect = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: const Offset(0.0, 15.0), width: 44.0, height: 36.0),
+      const Radius.circular(6.0),
+    );
+    _paint.style = PaintingStyle.fill;
+    _paint.shader = LinearGradient(
+      colors: [
+        const Color(0xFF37221C).withOpacity(opacity),
+        const Color(0xFF1E0E0B).withOpacity(opacity),
+      ],
+    ).createShader(Rect.fromCenter(center: const Offset(0.0, 15.0), width: 44.0, height: 36.0));
+
+    canvas.drawRRect(plateRect, _paint);
+    _paint.shader = null;
+
+    _paint.color = (allBoltsReleased ? const Color(0xFF00E5FF) : const Color(0xFFFFB300)).withOpacity(0.3 * opacity);
+    _paint.style = PaintingStyle.stroke;
+    _paint.strokeWidth = 1.0;
+    canvas.drawRRect(plateRect, _paint);
+
+    // 4. Gambar Baut Dekoratif Statis pada 4 Sudut Gembok
+    _drawSingleRivet(canvas, const Offset(-32.0, -9.0), opacity);
+    _drawSingleRivet(canvas, const Offset(32.0, -9.0), opacity);
+    _drawSingleRivet(canvas, const Offset(-32.0, 39.0), opacity);
+    _drawSingleRivet(canvas, const Offset(32.0, 39.0), opacity);
+
+    // 5. Menggambar Lubang Kunci
+    _paint.style = PaintingStyle.fill;
+    _paint.color = Colors.black.withOpacity(opacity);
+    canvas.drawCircle(const Offset(0.0, 10.0), 5.0, _paint);
+    final keyholePath = Path()
+      ..moveTo(-3.0, 10.0)
+      ..lineTo(3.0, 10.0)
+      ..lineTo(5.0, 23.0)
+      ..lineTo(-5.0, 23.0)
+      ..close();
+    canvas.drawPath(keyholePath, _paint);
+
+    _paint.color = (allBoltsReleased ? const Color(0xFF00E5FF) : const Color(0xFFFFD700)).withOpacity(0.35 * opacity);
+    _paint.style = PaintingStyle.stroke;
+    _paint.strokeWidth = 0.6;
+    canvas.drawCircle(const Offset(0.0, 10.0), 5.0, _paint);
+
+    canvas.restore();
+  }
+
+  void _drawSingleRivet(Canvas canvas, Offset offset, double opacity) {
+    _paint.shader = null;
+    _paint.color = const Color(0xFF212121).withOpacity(opacity);
+    _paint.style = PaintingStyle.fill;
+    canvas.drawCircle(offset, 4.5, _paint);
+
+    _paint.color = const Color(0xFFB0BEC5).withOpacity(opacity);
+    _paint.style = PaintingStyle.fill;
+    canvas.drawCircle(offset, 3.8, _paint);
+
+    _paint.color = const Color(0xFF37474F).withOpacity(opacity);
+    _paint.style = PaintingStyle.stroke;
+    _paint.strokeWidth = 1.0;
+    canvas.drawLine(offset - const Offset(2.0, 0.0), offset + const Offset(2.0, 0.0), _paint);
+    canvas.drawLine(offset - const Offset(0.0, 2.0), offset + const Offset(0.0, 2.0), _paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) {
+    return true;
   }
 }
 
@@ -547,24 +1448,21 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
 
                           // 3. GIGANTIC GHOST BACKGROUND MULTIPLIER
                           // Rendered in center, very low opacity so it floats BEHIND focus!
-                          Opacity(
-                            opacity: 0.08, // Extremely subtle ghost effect
-                            child: Transform.scale(
-                              // Reacts to the timer! Shrinks as combo fades!
-                              scale: 0.8 + (percent * 0.7),
-                              child: Text(
-                                '${count}X',
-                                style: TextStyle(
-                                  color: comboColor,
-                                  fontSize: 180,
-                                  fontWeight: FontWeight.w900,
-                                  fontFamily: 'Courier',
-                                  letterSpacing: -10,
-                                  fontStyle: FontStyle.italic,
-                                  shadows: [
-                                    Shadow(color: comboColor, blurRadius: 20),
-                                  ],
-                                ),
+                          Transform.scale(
+                            // Reacts to the timer! Shrinks as combo fades!
+                            scale: 0.8 + (percent * 0.7),
+                            child: Text(
+                              '${count}X',
+                              style: TextStyle(
+                                color: comboColor.withOpacity(0.08), // Apply opacity directly to the color!
+                                fontSize: 180,
+                                fontWeight: FontWeight.w900,
+                                fontFamily: 'Courier',
+                                letterSpacing: -10,
+                                fontStyle: FontStyle.italic,
+                                shadows: [
+                                  Shadow(color: comboColor.withOpacity(0.08), blurRadius: 20), // Apply opacity to shadows!
+                                ],
                               ),
                             ),
                           ),
@@ -727,6 +1625,7 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
                         onPressed: () {
                           widget.game.overlays.remove('HUD');
                           widget.game.overlays.add('MainMenu');
+                          widget.game.audio.playMenuBGM();
                         },
                       ),
                       Container(
@@ -2563,7 +3462,15 @@ class SettingsMenu extends StatefulWidget {
 }
 
 class _SettingsMenuState extends State<SettingsMenu> {
-  bool _soundEnabled = true;
+  late bool _bgmEnabled;
+  late bool _sfxEnabled;
+
+  @override
+  void initState() {
+    super.initState();
+    _bgmEnabled = widget.game.audio.isBgmEnabled;
+    _sfxEnabled = widget.game.audio.isSfxEnabled;
+  }
 
   Future<void> _launchURL(String urlString) async {
     final Uri url = Uri.parse(urlString);
@@ -2652,13 +3559,25 @@ class _SettingsMenuState extends State<SettingsMenu> {
                     _buildSettingsHeader(LangService.t('sett_module_controls')),
                     const SizedBox(height: 8),
                     _buildToggleItem(
+                      icon: Icons.music_note_rounded,
+                      title: LangService.t('sett_bgm_title'),
+                      subtitle: LangService.t('sett_bgm_subtitle'),
+                      value: _bgmEnabled,
+                      onChanged: (val) async {
+                        setState(() => _bgmEnabled = val);
+                        await widget.game.audio.setBgmEnabled(val);
+                        widget.game.audio.playBoosterClick();
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    _buildToggleItem(
                       icon: Icons.volume_up_rounded,
-                      title: LangService.t('sett_audio_title'),
-                      subtitle: LangService.t('sett_audio_subtitle'),
-                      value: _soundEnabled,
-                      onChanged: (val) {
-                        setState(() => _soundEnabled = val);
-                        // Triggers background routing loop logic
+                      title: LangService.t('sett_sfx_title'),
+                      subtitle: LangService.t('sett_sfx_subtitle'),
+                      value: _sfxEnabled,
+                      onChanged: (val) async {
+                        setState(() => _sfxEnabled = val);
+                        await widget.game.audio.setSfxEnabled(val);
                         widget.game.audio.playBoosterClick();
                       },
                     ),

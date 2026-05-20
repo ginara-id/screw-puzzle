@@ -6,11 +6,20 @@ import 'dart:math' as math;
 class VictoryGear extends PositionComponent with HasGameRef implements OpacityProvider {
   VictoryGear() : super(priority: 500);
 
-  double _opacity = 1.0;
+  double _opacity = 0.0;
   @override
   double get opacity => _opacity;
   @override
   set opacity(double value) => _opacity = value;
+
+  @override
+  void update(double dt) {
+    super.update(dt);
+    if (_opacity < 1.0) {
+      _opacity += dt * 2.0; // Smooth manual fade-in over 0.5 seconds
+      if (_opacity > 1.0) _opacity = 1.0;
+    }
+  }
 
   @override
   Future<void> onLoad() async {
@@ -38,8 +47,7 @@ class VictoryGear extends PositionComponent with HasGameRef implements OpacityPr
       ),
     );
 
-    // Fade in and Spin
-    add(OpacityEffect.fadeIn(EffectController(duration: 0.5)));
+    // Spin animation
     add(RotateEffect.by(2 * math.pi, EffectController(duration: 2, repeatCount: 1)));
     
     // Scale pulse

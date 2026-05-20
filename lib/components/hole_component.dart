@@ -15,6 +15,7 @@ class HoleComponent extends BodyComponent<ScrewPuzzleGame>
   bool isAdLocked;
   bool isTargetHighlight = false;
   double _pulseTime = 0.0;
+  double _errorFlashTimer = 0.0;
 
   Vector2 _scale = Vector2.all(1.0);
   @override
@@ -35,6 +36,29 @@ class HoleComponent extends BodyComponent<ScrewPuzzleGame>
     if (isTargetHighlight) {
       _pulseTime += dt * 5; // Pulse speed
     }
+    if (_errorFlashTimer > 0) {
+      _errorFlashTimer -= dt;
+      if (_errorFlashTimer < 0) {
+        _errorFlashTimer = 0.0;
+      }
+    }
+  }
+
+  void flashError() {
+    _errorFlashTimer = 0.4; // 0.4 seconds flash
+    
+    // Scale squeeze & bounce effect using Flame standard ScaleEffect
+    children.whereType<ScaleEffect>().forEach((e) => e.removeFromParent());
+    add(
+      ScaleEffect.to(
+        Vector2.all(0.82),
+        EffectController(
+          duration: 0.06,
+          reverseDuration: 0.12,
+          curve: Curves.easeOutBack,
+        ),
+      ),
+    );
   }
 
   @override
@@ -78,6 +102,13 @@ class HoleComponent extends BodyComponent<ScrewPuzzleGame>
   static final _lockBgPaint = Paint()..color = Colors.black.withOpacity(0.65);
   static final _btnShadowPaint = Paint()..color = Colors.black.withOpacity(0.5);
   
+  static final _errorGlowPaint = Paint()
+    ..style = PaintingStyle.fill
+    ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 0.15);
+  static final _errorStrokePaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 0.06;
+  
   // Caching dynamically generated objects
   Shader? _btnShader;
   Shader? _glassShader;
@@ -96,6 +127,16 @@ class HoleComponent extends BodyComponent<ScrewPuzzleGame>
 
     // 3. Metallic Rim
     canvas.drawCircle(Offset.zero, radius, _rimBasePaint);
+
+    // 3b. Glowing Red Error Flash Aura (optimized)
+    if (_errorFlashTimer > 0) {
+      final alpha = (_errorFlashTimer / 0.4 * 200).toInt().clamp(0, 255);
+      _errorGlowPaint.color = Color.fromARGB(alpha, 229, 57, 53); // Red glow
+      canvas.drawCircle(Offset.zero, radius * 1.15, _errorGlowPaint);
+
+      _errorStrokePaint.color = Color.fromARGB((alpha * 1.2).toInt().clamp(0, 255), 255, 110, 110); // Red stroke
+      canvas.drawCircle(Offset.zero, radius * 0.95, _errorStrokePaint);
+    }
 
     // 4. Target Highlight Glow (Only when active and not occupied)
     if (isTargetHighlight && !isOccupied && !isAdLocked) {
