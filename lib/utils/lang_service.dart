@@ -89,12 +89,14 @@ class LangService {
       'hud_combo': 'KOMBO!',
       'hud_alert_storm_no_rust': 'BADAI DITOLAK: TIDAK ADA KARAT!',
       'hud_alert_chronos_active': 'CHRONOS AKTIF',
+      'hud_facility_sector': 'SEKTOR FASILITAS',
       
       // Win / Lose
       'win_title': 'MISI BERHASIL',
       'win_next': 'SEKTOR BERIKUTNYA',
       'win_menu': 'MENU UTAMA',
       'win_replay': 'ULANGI SEKTOR',
+      'win_integrity': 'INTEGRITAS TERVERIFIKASI: 100%',
       'lose_title': 'MISI GAGAL',
       'lose_subtitle': 'KEHABISAN WAKTU',
       'lose_retry': 'ULANGI SEKTOR',
@@ -108,7 +110,7 @@ class LangService {
       'tuto_sel_left_t': 'LANGKAH 1: SELEKSI',
       'tuto_sel_left_c': 'Ketuk baut di ujung kiri untuk melonggarkannya dari cengkeraman besi.',
       'tuto_mov_left_t': 'LANGKAH 2: RELOKASI',
-      'tuto_mov_left_c': 'Sekora, ketuk lubang kosong di tengah bawah untuk memindahkan baut tersebut!',
+      'tuto_mov_left_c': 'Sekarang, ketuk lubang kosong di tengah bawah untuk memindahkan baut tersebut!',
       'tuto_sel_right_t': 'LANGKAH 3: KETUK BERIKUTNYA',
       'tuto_sel_right_c': 'Hebat! Sekarang ketuk baut di ujung kanan untuk melonggarkannya.',
       'tuto_mov_right_t': 'LANGKAH 4: RELOKASI',
@@ -141,6 +143,29 @@ class LangService {
       'tuto_chronos_c': 'Terakhir! Ketuk modul CHRONOS untuk membekukan jalannya waktu secara total agar Anda bisa berpikir jernih saat kritis!',
       'tuto_chronos_b': 'PELAJARI CHRONOS',
       'tuto_chronos_try_c': 'Bagus! Ketuk CHRONOS untuk membekukan waktu selama 10 detik. Selesaikan level ini sekarang juga!',
+
+      // Additional Unlocks & Dynamic Intro Keys
+      'tuto_unlock_hint': 'SERET GEMBOK KE BAWAH UNTUK MEMBUKA!',
+      'tuto_unlock_granted': 'AKSES SEKTOR DIIZINKAN!',
+      'tuto_new_sector': 'INTRUSI SEKTOR BARU',
+      'tuto_access_granted': 'AKSES DIIZINKAN KE SEKTOR',
+      'tuto_unlock_success_desc': 'SEMUA BAUT TERKAIT TELAH DIDEKRIPSI. SISTEM PENGUNCI BERHASIL DIATUR ULANG.',
+      'tuto_sector_access': 'AKSES SEKTOR',
+
+      // Ads & Loading
+      'ad_refill_booster': 'ISI ULANG {booster}',
+      'ad_unlock_slot': 'BUKA SLOT',
+      'ad_refill_desc': 'Tonton video singkat untuk mendapatkan +1 isi ulang booster {booster} secara instan.',
+      'ad_unlock_desc': 'Tonton video singkat untuk mendapatkan akses permanen ke slot industri ini.',
+      'ad_cancel': 'BATAL',
+      'ad_watch': 'TONTON IKLAN',
+      'ad_loading': 'MEMUAT TAYANGAN IKLAN AMAN...',
+
+      // Splash Loader
+      'splash_forging': 'MENEMPA RAKITAN...',
+      'splash_heating': 'MEMANASKAN BAUT INTI...',
+      'splash_testing': 'MENGUJI INTEGRITAS ALOI...',
+      'splash_ready': 'SISTEM SIAP!',
     },
     'en': {
       // Main Menu
@@ -170,12 +195,14 @@ class LangService {
       'hud_combo': 'COMBO!',
       'hud_alert_storm_no_rust': 'STORM DENIED: NO RUST DETECTED!',
       'hud_alert_chronos_active': 'CHRONOS ACTIVE',
+      'hud_facility_sector': 'FACILITY SECTOR',
       
       // Win / Lose
       'win_title': 'VICTORY ACHIEVED',
       'win_next': 'NEXT SECTOR',
       'win_menu': 'MAIN MENU',
       'win_replay': 'REPLAY SECTOR',
+      'win_integrity': 'INTEGRITY VERIFIED: 100%',
       'lose_title': 'MISSION FAILED',
       'lose_subtitle': 'TIME DEPLETED',
       'lose_retry': 'RETRY SECTOR',
@@ -222,6 +249,29 @@ class LangService {
       'tuto_chronos_c': 'Finally! Tap the CHRONOS module to totally freeze the flow of time so you can think clearly in tight situations!',
       'tuto_chronos_b': 'LEARN CHRONOS',
       'tuto_chronos_try_c': 'Perfect! Tap CHRONOS to freeze time for 10 seconds. Complete the level right now!',
+
+      // Additional Unlocks & Dynamic Intro Keys
+      'tuto_unlock_hint': 'DRAG LOCK DOWN TO UNLOCK!',
+      'tuto_unlock_granted': 'SECTOR ACCESS GRANTED!',
+      'tuto_new_sector': 'NEW SECTOR INTRUSION',
+      'tuto_access_granted': 'ACCESS GRANTED TO SECTOR',
+      'tuto_unlock_success_desc': 'ALL CORRESPONDING BOLTS DECRYPTED. LOCK SYSTEM FLUSHED SUCCESSFULLY.',
+      'tuto_sector_access': 'SECTOR ACCESS',
+
+      // Ads & Loading
+      'ad_refill_booster': 'REFILL {booster}',
+      'ad_unlock_slot': 'UNLOCK SLOT',
+      'ad_refill_desc': 'Watch a short video to instantly claim +1 {booster} booster charge.',
+      'ad_unlock_desc': 'Watch a short video to gain permanent access to this industrial slot.',
+      'ad_cancel': 'CANCEL',
+      'ad_watch': 'WATCH AD',
+      'ad_loading': 'LOADING SECURE AD STREAM...',
+
+      // Splash Loader
+      'splash_forging': 'FORGING ASSEMBLIES...',
+      'splash_heating': 'HEATING CORE RIVETS...',
+      'splash_testing': 'TESTING ALLOY INTEGRITY...',
+      'splash_ready': 'SYSTEM GO!',
     }
   };
 }

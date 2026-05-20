@@ -5,6 +5,7 @@ import 'package:sensors_plus/sensors_plus.dart';
 import 'package:flame_audio/flame_audio.dart';
 import '../main.dart';
 import '../utils/firebase_level_service.dart';
+import '../utils/lang_service.dart';
 
 enum SplashSequence {
   studioIntro, // 0 - 2.5s: Showing Eamon
@@ -306,66 +307,71 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   }
 
   Widget _buildModernLoader(double fade) {
-    return AnimatedBuilder(
-      animation: _loadingController,
-      builder: (context, _) {
-        final pct = (_loadingController.value * 100).toInt();
-        
-        // Dynamic system status text switching
-        String status = "FORGING ASSEMBLIES...";
-        if (pct > 35) status = "HEATING CORE RIVETS...";
-        if (pct > 70) status = "TESTING ALLOY INTEGRITY...";
-        if (pct > 95) status = "SYSTEM GO!";
+    return ValueListenableBuilder<String>(
+      valueListenable: LangService().localeNotifier,
+      builder: (context, locale, _) {
+        return AnimatedBuilder(
+          animation: _loadingController,
+          builder: (context, _) {
+            final pct = (_loadingController.value * 100).toInt();
+            
+            // Dynamic system status text switching
+            String status = LangService.t('splash_forging');
+            if (pct > 35) status = LangService.t('splash_heating');
+            if (pct > 70) status = LangService.t('splash_testing');
+            if (pct > 95) status = LangService.t('splash_ready');
 
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              status,
-              style: TextStyle(
-                color: const Color(0xFFFFD180).withOpacity(fade),
-                fontSize: 11,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 2.5,
-                fontFamily: 'Courier',
-              ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              width: 260,
-              height: 6,
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(fade),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.white.withOpacity(0.1 * fade), width: 1),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: FractionallySizedBox(
-                alignment: Alignment.centerLeft,
-                widthFactor: _loadingController.value,
-                child: Container(
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  status,
+                  style: TextStyle(
+                    color: const Color(0xFFFFD180).withOpacity(fade),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 2.5,
+                    fontFamily: 'Courier',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  width: 260,
+                  height: 6,
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        const Color(0xFFD84315).withOpacity(fade),
-                        const Color(0xFFFFB300).withOpacity(fade),
-                      ],
+                    color: Colors.black.withOpacity(fade),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.white.withOpacity(0.1 * fade), width: 1),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: _loadingController.value,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            const Color(0xFFD84315).withOpacity(fade),
+                            const Color(0xFFFFB300).withOpacity(fade),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '$pct%',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.24 * fade),
-                fontSize: 10,
-                fontFamily: 'monospace',
-                fontWeight: FontWeight.bold,
-              ),
-            )
-          ],
+                const SizedBox(height: 8),
+                Text(
+                  '$pct%',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.24 * fade),
+                    fontSize: 10,
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.bold,
+                  ),
+                )
+              ],
+            );
+          },
         );
       },
     );

@@ -43,101 +43,106 @@ class _WinMenuState extends State<WinMenu> {
       );
     }
 
-    return Stack(
-      children: [
-        // Efficient Semi-Transparent Overlay (Zero GPU Cost)
-        Positioned.fill(child: Container(color: Colors.black.withOpacity(0.7))),
-        Center(
-          child: TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0.0, end: 1.0),
-            duration: const Duration(milliseconds: 600),
-            curve: Curves.easeOutBack,
-            builder: (context, value, child) {
-              return Transform.scale(scale: value, child: child);
-            },
-            child: Container(
-              width: 340,
-              padding: const EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [
-                    Color(0xFFB8860B),
-                    Color(0xFF3E2723),
-                    Color(0xFFB8860B),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.8),
-                    blurRadius: 40,
-                    spreadRadius: 10,
+    return ValueListenableBuilder<String>(
+      valueListenable: LangService().localeNotifier,
+      builder: (context, locale, _) {
+        return Stack(
+          children: [
+            // Efficient Semi-Transparent Overlay (Zero GPU Cost)
+            Positioned.fill(child: Container(color: Colors.black.withOpacity(0.7))),
+            Center(
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.0, end: 1.0),
+                duration: const Duration(milliseconds: 600),
+                curve: Curves.easeOutBack,
+                builder: (context, value, child) {
+                  return Transform.scale(scale: value, child: child);
+                },
+                child: Container(
+                  width: 340,
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [
+                        Color(0xFFB8860B),
+                        Color(0xFF3E2723),
+                        Color(0xFFB8860B),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.8),
+                        blurRadius: 40,
+                        spreadRadius: 10,
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: Container(
-                padding: const EdgeInsets.all(32),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A1A),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    _buildRivets(),
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
+                  child: Container(
+                    padding: const EdgeInsets.all(32),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A1A1A),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Stack(
+                      clipBehavior: Clip.none,
                       children: [
-                        const Icon(
-                          Icons.verified_user_rounded,
-                          color: Color(0xFFFF9800),
-                          size: 80,
-                        ),
-                        const SizedBox(height: 24),
-                        Text(
-                          LangService.t('win_title'),
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Color(0xFFFF9800),
-                            fontSize: 28,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 4.0,
-                            fontFamily: 'Courier',
-                            shadows: [
-                              Shadow(color: Color(0xFFFF9800), blurRadius: 15),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'INTEGRITY VERIFIED: 100%',
-                          style: TextStyle(
-                            color: Colors.greenAccent.withOpacity(0.8),
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'monospace',
-                          ),
-                        ),
-                        const SizedBox(height: 40),
-                        _buildMenuButton(
-                          label: LangService.t('win_next'),
-                          icon: Icons.double_arrow_rounded,
-                          onPressed: () {
-                            widget.game.overlays.remove('WinMenu');
-                            widget.game.nextLevel();
-                          },
+                        _buildRivets(),
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.verified_user_rounded,
+                              color: Color(0xFFFF9800),
+                              size: 80,
+                            ),
+                            const SizedBox(height: 24),
+                            Text(
+                              LangService.t('win_title'),
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Color(0xFFFF9800),
+                                fontSize: 28,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 4.0,
+                                fontFamily: 'Courier',
+                                shadows: [
+                                  Shadow(color: Color(0xFFFF9800), blurRadius: 15),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              LangService.t('win_integrity'),
+                              style: TextStyle(
+                                color: Colors.greenAccent.withOpacity(0.8),
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                            const SizedBox(height: 40),
+                            _buildMenuButton(
+                              label: LangService.t('win_next'),
+                              icon: Icons.double_arrow_rounded,
+                              onPressed: () {
+                                widget.game.overlays.remove('WinMenu');
+                                widget.game.nextLevel();
+                              },
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 
@@ -258,7 +263,7 @@ class _NewLevelUnlockIntroState extends State<NewLevelUnlockIntro>
   double _shakeTime = 0.0;
 
   // Efek teks instruksi / peringatan
-  String _hintText = "SERET GEMBOK KE BAWAH UNTUK MEMBUKA!";
+  String _hintKey = 'tuto_unlock_hint';
   Color _hintColor = const Color(0xFF00E5FF);
   double _hintPulse = 1.0;
 
@@ -400,7 +405,7 @@ class _NewLevelUnlockIntroState extends State<NewLevelUnlockIntro>
     setState(() {
       _isUnlocked = true;
       _dragOffset = 60.0;
-      _hintText = "AKSES SEKTOR DIIZINKAN!";
+      _hintKey = 'tuto_unlock_granted';
       _hintColor = Colors.greenAccent;
     });
 
@@ -419,244 +424,252 @@ class _NewLevelUnlockIntroState extends State<NewLevelUnlockIntro>
     final newLevel = widget.game.currentLevel + 1;
     const allBoltsReleased = true;
 
-    return Stack(
-      children: [
-        // Latar belakang premium fiksi ilmiah gelap gulita
-        Positioned.fill(
-          child: Container(
-            decoration: const BoxDecoration(
-              gradient: RadialGradient(
-                colors: [
-                  Color(0xFF140F08),
-                  Color(0xFF060606),
-                ],
-                center: Alignment.center,
-                radius: 1.3,
-              ),
-            ),
-          ),
-        ),
+    return ValueListenableBuilder<String>(
+      valueListenable: LangService().localeNotifier,
+      builder: (context, locale, _) {
+        final hintText = LangService.t(_hintKey);
 
-        // Grid, Partikel, Aura, & Cincin Holografik
-        Positioned.fill(
-          child: CustomPaint(
-            painter: _UnlockIntroPainter(
-              progress: _controller.value,
-              particles: _particles,
-              isUnlocked: _isUnlocked,
-              allBoltsReleased: allBoltsReleased,
-              dragOffset: _dragOffset,
-              idleY: _idleY,
-              shakeOffset: _shakeOffset,
-            ),
-          ),
-        ),
-
-        // Elemen Teks dan Tombol
-        Positioned.fill(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Judul Transisi Mewah
-              Opacity(
-                opacity: _isUnlocked ? ((_controller.value - 0.1) / 0.3).clamp(0.0, 1.0) : 0.8,
-                child: Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: _hintColor.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: _hintColor.withOpacity(0.35),
-                          width: 1.2,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            _isUnlocked ? Icons.lock_open_rounded : Icons.lock_outline_rounded,
-                            color: _hintColor,
-                            size: 14,
-                          ),
-                          const SizedBox(width: 8),
-                          AnimatedScale(
-                            scale: _hintPulse,
-                            duration: const Duration(milliseconds: 150),
-                            child: Text(
-                              _hintText,
-                              style: TextStyle(
-                                color: _hintColor,
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 2,
-                                fontFamily: 'monospace',
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      'NEW SECTOR INTRUSION',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 6.0,
-                        fontFamily: 'Courier',
-                        shadows: [
-                          Shadow(color: Colors.white12, blurRadius: 8),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 35),
-
-              // Area Interaktif Puzzle Gembok 250x250 (Hanya Drag Vertikal)
-              GestureDetector(
-                onVerticalDragStart: _onDragStart,
-                onVerticalDragUpdate: _onDragUpdate,
-                onVerticalDragEnd: _onDragEnd,
-                behavior: HitTestBehavior.opaque,
-                child: const SizedBox(
-                  width: 250,
-                  height: 250,
-                ),
-              ),
-
-              const SizedBox(height: 35),
-
-              // Akses Level Status di Bawah
-              Opacity(
-                opacity: _isUnlocked ? (_controller.value / 0.4).clamp(0.0, 1.0) : 0.0,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 44),
-                  child: Column(
-                    children: [
-                      Text(
-                        'ACCESS GRANTED TO SECTOR #$newLevel.',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Color(0xFFFFB300),
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 2.5,
-                          fontFamily: 'Courier',
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'ALL CORRESPONDING BOLTS DECRYPTED. LOCK SYSTEM FLUSHED SUCCESSFULLY.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.grey[500],
-                          fontSize: 10,
-                          height: 1.4,
-                          letterSpacing: 1.2,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
+        return Stack(
+          children: [
+            // Latar belakang premium fiksi ilmiah gelap gulita
+            Positioned.fill(
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: RadialGradient(
+                    colors: [
+                      Color(0xFF140F08),
+                      Color(0xFF060606),
                     ],
+                    center: Alignment.center,
+                    radius: 1.3,
                   ),
                 ),
               ),
+            ),
 
-              const SizedBox(height: 50),
+            // Grid, Partikel, Aura, & Cincin Holografik
+            Positioned.fill(
+              child: CustomPaint(
+                painter: _UnlockIntroPainter(
+                  progress: _controller.value,
+                  particles: _particles,
+                  isUnlocked: _isUnlocked,
+                  allBoltsReleased: allBoltsReleased,
+                  dragOffset: _dragOffset,
+                  idleY: _idleY,
+                  shakeOffset: _shakeOffset,
+                  sectorAccessText: LangService.t('tuto_sector_access'),
+                ),
+              ),
+            ),
 
-              // Tombol Enter Sector yang menyala dan opsi menu tambahan (Replay / Home / Next)
-              Opacity(
-                opacity: _isUnlocked ? ((_controller.value - 0.4) / 0.3).clamp(0.0, 1.0) : 0.0,
-                child: _isUnlocked
-                    ? Transform.translate(
-                        offset: Offset(0.0, 15.0 * (1.0 - ((_controller.value - 0.4) / 0.3).clamp(0.0, 1.0))),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // 1. Tombol Utama: SEKTOR BERIKUTNYA
-                            Container(
-                              width: 260,
-                              height: 52,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(26),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(0xFFFF9800).withOpacity(0.25),
-                                    blurRadius: 12,
-                                    spreadRadius: 1,
-                                  ),
-                                ],
+            // Elemen Teks dan Tombol
+            Positioned.fill(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Judul Transisi Mewah
+                  Opacity(
+                    opacity: _isUnlocked ? ((_controller.value - 0.1) / 0.3).clamp(0.0, 1.0) : 0.8,
+                    child: Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: _hintColor.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: _hintColor.withOpacity(0.35),
+                              width: 1.2,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _isUnlocked ? Icons.lock_open_rounded : Icons.lock_outline_rounded,
+                                color: _hintColor,
+                                size: 14,
                               ),
-                              child: ElevatedButton(
-                                onPressed: _skipIntro,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFFF9800),
-                                  foregroundColor: Colors.black,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(26),
+                              const SizedBox(width: 8),
+                              AnimatedScale(
+                                scale: _hintPulse,
+                                duration: const Duration(milliseconds: 150),
+                                child: Text(
+                                  hintText,
+                                  style: TextStyle(
+                                    color: _hintColor,
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 2,
+                                    fontFamily: 'monospace',
                                   ),
                                 ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      LangService.t('win_next'),
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w900,
-                                        fontSize: 14,
-                                        letterSpacing: 2.5,
-                                        fontFamily: 'Courier',
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        Text(
+                          LangService.t('tuto_new_sector'),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 6.0,
+                            fontFamily: 'Courier',
+                            shadows: [
+                              Shadow(color: Colors.white12, blurRadius: 8),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 35),
+
+                  // Area Interaktif Puzzle Gembok 250x250 (Hanya Drag Vertikal)
+                  GestureDetector(
+                    onVerticalDragStart: _onDragStart,
+                    onVerticalDragUpdate: _onDragUpdate,
+                    onVerticalDragEnd: _onDragEnd,
+                    behavior: HitTestBehavior.opaque,
+                    child: const SizedBox(
+                      width: 250,
+                      height: 250,
+                    ),
+                  ),
+
+                  const SizedBox(height: 35),
+
+                  // Akses Level Status di Bawah
+                  Opacity(
+                    opacity: _isUnlocked ? (_controller.value / 0.4).clamp(0.0, 1.0) : 0.0,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 44),
+                      child: Column(
+                        children: [
+                          Text(
+                            "${LangService.t('tuto_access_granted')} #$newLevel.",
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Color(0xFFFFB300),
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 2.5,
+                              fontFamily: 'Courier',
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            LangService.t('tuto_unlock_success_desc'),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.grey[500],
+                              fontSize: 10,
+                              height: 1.4,
+                              letterSpacing: 1.2,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 50),
+
+                  // Tombol Enter Sector yang menyala dan opsi menu tambahan (Replay / Home / Next)
+                  Opacity(
+                    opacity: _isUnlocked ? ((_controller.value - 0.4) / 0.3).clamp(0.0, 1.0) : 0.0,
+                    child: _isUnlocked
+                        ? Transform.translate(
+                            offset: Offset(0.0, 15.0 * (1.0 - ((_controller.value - 0.4) / 0.3).clamp(0.0, 1.0))),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // 1. Tombol Utama: SEKTOR BERIKUTNYA
+                                Container(
+                                  width: 260,
+                                  height: 52,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(26),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFFFF9800).withOpacity(0.25),
+                                        blurRadius: 12,
+                                        spreadRadius: 1,
+                                      ),
+                                    ],
+                                  ),
+                                  child: ElevatedButton(
+                                    onPressed: _skipIntro,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFFFF9800),
+                                      foregroundColor: Colors.black,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(26),
                                       ),
                                     ),
-                                    const SizedBox(width: 8),
-                                    const Icon(Icons.arrow_forward_rounded, size: 18),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          LangService.t('win_next'),
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w900,
+                                            fontSize: 14,
+                                            letterSpacing: 2.5,
+                                            fontFamily: 'Courier',
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        const Icon(Icons.arrow_forward_rounded, size: 18),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                // 2. Tombol Sekunder Row: REPLAY & HOME
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    _buildSecondaryButton(
+                                      label: LangService.t('win_replay'),
+                                      icon: Icons.refresh_rounded,
+                                      borderColor: const Color(0xFFFF9800).withOpacity(0.4),
+                                      onPressed: () {
+                                        widget.game.overlays.remove('WinMenu');
+                                        widget.game.resetLevel(mode: TransitionMode.openOnly);
+                                      },
+                                    ),
+                                    const SizedBox(width: 12),
+                                    _buildSecondaryButton(
+                                      label: LangService.t('win_menu'),
+                                      icon: Icons.home_rounded,
+                                      borderColor: Colors.white.withOpacity(0.2),
+                                      onPressed: () {
+                                        widget.game.overlays.remove('WinMenu');
+                                        widget.game.overlays.add('MainMenu');
+                                        widget.game.audio.playMenuBGM();
+                                      },
+                                    ),
                                   ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            // 2. Tombol Sekunder Row: REPLAY & HOME
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                _buildSecondaryButton(
-                                  label: LangService.t('win_replay'),
-                                  icon: Icons.refresh_rounded,
-                                  borderColor: const Color(0xFFFF9800).withOpacity(0.4),
-                                  onPressed: () {
-                                    widget.game.overlays.remove('WinMenu');
-                                    widget.game.resetLevel(mode: TransitionMode.openOnly);
-                                  },
-                                ),
-                                const SizedBox(width: 12),
-                                _buildSecondaryButton(
-                                  label: LangService.t('win_menu'),
-                                  icon: Icons.home_rounded,
-                                  borderColor: Colors.white.withOpacity(0.2),
-                                  onPressed: () {
-                                    widget.game.overlays.remove('WinMenu');
-                                    widget.game.overlays.add('MainMenu');
-                                    widget.game.audio.playMenuBGM();
-                                  },
                                 ),
                               ],
                             ),
-                          ],
-                        ),
-                      )
-                    : const SizedBox.shrink(),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ),
-      ],
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -736,6 +749,7 @@ class _UnlockIntroPainter extends CustomPainter {
   final double dragOffset;
   final double idleY;
   final double shakeOffset;
+  final String sectorAccessText;
 
   // Optimasi performa: satu Paint re-usable
   final Paint _paint = Paint();
@@ -748,6 +762,7 @@ class _UnlockIntroPainter extends CustomPainter {
     required this.dragOffset,
     required this.idleY,
     required this.shakeOffset,
+    required this.sectorAccessText,
   });
 
   @override
@@ -905,7 +920,7 @@ class _UnlockIntroPainter extends CustomPainter {
 
   void _paintLevelText(Canvas canvas, Offset center) {
     final textSpan = TextSpan(
-      text: 'SECTOR ACCESS',
+      text: sectorAccessText,
       style: TextStyle(
         color: Colors.white.withOpacity(0.12),
         fontSize: 18,
@@ -1099,102 +1114,107 @@ class GameOverMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: Container(color: Colors.black.withOpacity(0.75)),
-        ),
-        Center(
-          child: TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0.0, end: 1.0),
-            duration: const Duration(milliseconds: 600),
-            curve: Curves.bounceOut,
-            builder: (context, value, child) {
-              return Transform.scale(scale: value, child: child);
-            },
-            child: Container(
-              width: 340,
-              padding: const EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [
-                    Colors.redAccent,
-                    Color(0xFF310000),
-                    Colors.redAccent,
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.8),
-                    blurRadius: 40,
-                    spreadRadius: 10,
+    return ValueListenableBuilder<String>(
+      valueListenable: LangService().localeNotifier,
+      builder: (context, locale, _) {
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: Container(color: Colors.black.withOpacity(0.75)),
+            ),
+            Center(
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.0, end: 1.0),
+                duration: const Duration(milliseconds: 600),
+                curve: Curves.bounceOut,
+                builder: (context, value, child) {
+                  return Transform.scale(scale: value, child: child);
+                },
+                child: Container(
+                  width: 340,
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [
+                        Colors.redAccent,
+                        Color(0xFF310000),
+                        Colors.redAccent,
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.8),
+                        blurRadius: 40,
+                        spreadRadius: 10,
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: Container(
-                padding: const EdgeInsets.all(32),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A1A),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    _buildRivets(),
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
+                  child: Container(
+                    padding: const EdgeInsets.all(32),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A1A1A),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Stack(
+                      clipBehavior: Clip.none,
                       children: [
-                        const Icon(
-                          Icons.report_problem_rounded,
-                          color: Colors.redAccent,
-                          size: 80,
-                        ),
-                        const SizedBox(height: 24),
-                        Text(
-                          LangService.t('lose_title'),
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.redAccent,
-                            fontSize: 28,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 2.0,
-                            fontFamily: 'Courier',
-                            shadows: [
-                              Shadow(color: Colors.redAccent, blurRadius: 15),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          LangService.t('lose_subtitle'),
-                          style: const TextStyle(
-                            color: Colors.redAccent,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'monospace',
-                          ),
-                        ),
-                        const SizedBox(height: 40),
-                        _buildMenuButton(
-                          label: LangService.t('lose_retry'),
-                          icon: Icons.refresh_rounded,
-                          onPressed: () {
-                            game.overlays.remove('GameOverMenu');
-                            game.resetLevel(mode: TransitionMode.openOnly);
-                          },
+                        _buildRivets(),
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.report_problem_rounded,
+                              color: Colors.redAccent,
+                              size: 80,
+                            ),
+                            const SizedBox(height: 24),
+                            Text(
+                              LangService.t('lose_title'),
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.redAccent,
+                                fontSize: 28,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 2.0,
+                                fontFamily: 'Courier',
+                                shadows: [
+                                  Shadow(color: Colors.redAccent, blurRadius: 15),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              LangService.t('lose_subtitle'),
+                              style: const TextStyle(
+                                color: Colors.redAccent,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                            const SizedBox(height: 40),
+                            _buildMenuButton(
+                              label: LangService.t('lose_retry'),
+                              icon: Icons.refresh_rounded,
+                              onPressed: () {
+                                game.overlays.remove('GameOverMenu');
+                                game.resetLevel(mode: TransitionMode.openOnly);
+                              },
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 
@@ -1303,9 +1323,12 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _pulseController,
-      builder: (context, child) {
+    return ValueListenableBuilder<String>(
+      valueListenable: LangService().localeNotifier,
+      builder: (context, locale, _) {
+        return AnimatedBuilder(
+          animation: _pulseController,
+          builder: (context, child) {
         final time = widget.game.remainingTime;
         final isLowTime = time < 10 && time > 0;
         final minutes = (time / 60).floor().toString().padLeft(2, '0');
@@ -1508,7 +1531,7 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            'FACILITY SECTOR',
+                            LangService.t('hud_facility_sector'),
                             style: TextStyle(
                               color: Colors.white.withOpacity(0.5),
                               fontSize: 9,
@@ -1942,6 +1965,8 @@ class _HUDMenuState extends State<HUDMenu> with TickerProviderStateMixin {
         );
       },
     );
+      },
+    );
   }
 
   /// Core Glassmorphism Container Generator
@@ -2314,43 +2339,48 @@ class _MainMenuState extends State<MainMenu>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF121212), // Pure Iron Charcoal
-              Color(0xFF1F1F1F), // Warm Smelter Grey
-              Color(0xFF161616), // Hard Iron Ground
-            ],
-          ),
-        ),
-        child: Stack(
-          children: [
-            _buildAnimatedBackground(),
-            _buildParticleSystem(),
-            SafeArea(
-              child: Column(
-                children: [
-                  _buildPremiumTopBar(),
-                  Expanded(
-                    child: Stack(
-                      children: [
-                        _buildJourneyList(),
-                        _buildBottomGradient(),
-                        _buildFloatingPlayButton(),
-                      ],
-                    ),
-                  ),
+    return ValueListenableBuilder<String>(
+      valueListenable: LangService().localeNotifier,
+      builder: (context, locale, _) {
+        return Scaffold(
+          backgroundColor: Colors.transparent,
+          body: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFF1E1E1E), // Industrial steel grey
+                  Color(0xFF141414), // Modern dark grey
+                  Color(0xFF0D0D0D), // Bottom deep black base
                 ],
               ),
             ),
-          ],
-        ),
-      ),
+            child: Stack(
+              children: [
+                _buildAnimatedBackground(),
+                _buildParticleSystem(),
+                SafeArea(
+                  child: Column(
+                    children: [
+                      _buildPremiumTopBar(),
+                      Expanded(
+                        child: Stack(
+                          children: [
+                            _buildJourneyList(),
+                            _buildBottomGradient(),
+                            _buildFloatingPlayButton(),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -2358,27 +2388,22 @@ class _MainMenuState extends State<MainMenu>
     return ClipRRect(
       borderRadius: BorderRadius.circular(24),
       child: Container(
-        // Removed expensive BackdropFilter for TopBar
-        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
+        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
         margin: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF0A1128).withOpacity(
-            0.85,
-          ), // Increased opacity to maintain glass look without blur overhead
+          color: const Color(0xFF1A1A1A).withOpacity(0.85),
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white.withOpacity(0.15), width: 1.0),
+          border: Border.all(color: const Color(0xFFFF9800).withOpacity(0.25), width: 1.2),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.2),
+              color: Colors.black.withOpacity(0.3),
               blurRadius: 30,
               spreadRadius: -5,
             ),
             BoxShadow(
-              color: const Color(
-                0xFFFFD600,
-              ).withOpacity(0.05), // Cyan ambient glow
+              color: const Color(0xFFFF9800).withOpacity(0.08), // Industrial Orange ambient glow
               blurRadius: 20,
-              spreadRadius: 5,
+              spreadRadius: 3,
             ),
           ],
         ),
@@ -2392,16 +2417,16 @@ class _MainMenuState extends State<MainMenu>
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFFD600).withOpacity(0.1),
+                    color: const Color(0xFFFF9800).withOpacity(0.1),
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: const Color(0xFFFFD600).withOpacity(0.3),
+                      color: const Color(0xFFFF9800).withOpacity(0.3),
                       width: 1.5,
                     ),
                   ),
                   child: const Icon(
                     Icons.precision_manufacturing_rounded,
-                    color: Color(0xFFFFD600),
+                    color: Color(0xFFFF9800),
                     size: 20,
                   ),
                 ),
@@ -2413,10 +2438,10 @@ class _MainMenuState extends State<MainMenu>
                     Text(
                       LangService.t('main_current_sector'),
                       style: TextStyle(
-                        color: const Color(0xFFFFD600).withOpacity(0.6),
+                        color: const Color(0xFFFF9800).withOpacity(0.8),
                         fontSize: 9,
                         fontWeight: FontWeight.bold,
-                        letterSpacing: 1,
+                        letterSpacing: 1.2,
                         fontFamily: 'monospace',
                       ),
                     ),
@@ -2426,10 +2451,10 @@ class _MainMenuState extends State<MainMenu>
                         color: Colors.white,
                         fontSize: 16,
                         fontWeight: FontWeight.w900,
-                        letterSpacing: 1,
-                        fontFamily: 'Courier',
+                        letterSpacing: 1.5,
+                        fontFamily: 'monospace',
                         shadows: [
-                          Shadow(color: Color(0xFFFFD600), blurRadius: 10),
+                          Shadow(color: Color(0xFFFF9800), blurRadius: 10),
                         ],
                       ),
                     ),
@@ -2437,9 +2462,14 @@ class _MainMenuState extends State<MainMenu>
                 ),
               ],
             ),
-            _buildGlassIconButton(
-              icon: Icons.settings_outlined,
-              onPressed: () => widget.game.overlays.add('SettingsMenu'),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildGlassIconButton(
+                  icon: Icons.settings_outlined,
+                  onPressed: () => widget.game.overlays.add('SettingsMenu'),
+                ),
+              ],
             ),
           ],
         ),
@@ -2453,18 +2483,19 @@ class _MainMenuState extends State<MainMenu>
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: const Color(0xFFFF9800).withOpacity(0.05),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
+        border: Border.all(color: const Color(0xFFFF9800).withOpacity(0.2), width: 1.2),
       ),
       child: IconButton(
         onPressed: onPressed,
         icon: Icon(
           icon,
-          color: const Color(0xFFFFD600),
-          size: 28,
-        ), // Updated to Cyan
-        padding: const EdgeInsets.all(12),
+          color: const Color(0xFFFF9800),
+          size: 26,
+        ),
+        padding: const EdgeInsets.all(10),
+        constraints: const BoxConstraints(),
       ),
     );
   }
@@ -2477,9 +2508,7 @@ class _MainMenuState extends State<MainMenu>
           return CustomPaint(
             painter: _ModernGridPainter(
               animValue: _animController.value,
-              gridColor: const Color(
-                0xFFFFD600,
-              ).withOpacity(0.05), // Updated to Cyan
+              gridColor: const Color(0xFFFF9800).withOpacity(0.04),
             ),
           );
         },
@@ -2543,8 +2572,8 @@ class _MainMenuState extends State<MainMenu>
             end: Alignment.bottomCenter,
             colors: [
               Colors.transparent,
-              const Color(0xFF0A0B0C).withOpacity(0.8),
-              const Color(0xFF0A0B0C),
+              const Color(0xFF0D0D0D).withOpacity(0.85),
+              const Color(0xFF0D0D0D),
             ],
           ),
         ),
@@ -2584,7 +2613,7 @@ class _ParticlePainter extends CustomPainter {
   final math.Random random = math.Random(1234);
 
   _ParticlePainter({required this.animValue})
-    : particles = List.generate(30, (i) {
+    : particles = List.generate(35, (i) {
         final r = math.Random(i);
         return Offset(r.nextDouble(), r.nextDouble());
       });
@@ -2592,23 +2621,23 @@ class _ParticlePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFFFFD600).withOpacity(0.15); // Updated to Cyan
+      ..color = const Color(0xFFFF9800).withOpacity(0.12); // Industrial Orange Sparks
 
     for (var i = 0; i < particles.length; i++) {
       final p = particles[i];
-      final yOffset = (animValue * 0.2 + p.dy) % 1.0;
-      final xOffset = p.dx + math.sin(animValue * math.pi * 2 + i) * 0.01;
+      final yOffset = (animValue * 0.15 + p.dy) % 1.0;
+      final xOffset = p.dx + math.sin(animValue * math.pi * 2 + i) * 0.015;
 
       final pos = Offset(xOffset * size.width, yOffset * size.height);
-      final radius = 1.0 + math.sin(animValue * math.pi * 2 + i) * 1.0;
+      final radius = 0.8 + math.sin(animValue * math.pi * 2 + i) * 0.8;
 
       canvas.drawCircle(pos, radius, paint);
 
-      // Subtle glow
+      // Warm Orange Glow aura
       canvas.drawCircle(
         pos,
-        radius * 3,
-        Paint()..color = paint.color.withOpacity(0.05),
+        radius * 3.5,
+        Paint()..color = paint.color.withOpacity(0.04),
       );
     }
   }
@@ -2628,12 +2657,12 @@ class _ModernGridPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = gridColor
-      ..strokeWidth = 1;
+      ..strokeWidth = 0.8;
 
     const spacing = 40.0;
     final offset = (animValue * spacing) % spacing;
 
-    // Draw main grid
+    // Draw main grid lines
     for (double i = 0; i < size.width; i += spacing) {
       canvas.drawLine(Offset(i, 0), Offset(i, size.height), paint);
     }
@@ -2641,10 +2670,10 @@ class _ModernGridPainter extends CustomPainter {
       canvas.drawLine(Offset(0, i), Offset(size.width, i), paint);
     }
 
-    // Draw larger blueprint squares
+    // Draw larger blueprint tech squares
     final secondaryPaint = Paint()
-      ..color = gridColor.withOpacity(gridColor.opacity * 2)
-      ..strokeWidth = 1.5;
+      ..color = gridColor.withOpacity(gridColor.opacity * 2.5)
+      ..strokeWidth = 1.2;
 
     for (double i = 0; i < size.width; i += spacing * 4) {
       canvas.drawLine(Offset(i, 0), Offset(i, size.height), secondaryPaint);
@@ -2657,27 +2686,43 @@ class _ModernGridPainter extends CustomPainter {
       canvas.drawLine(Offset(0, i), Offset(size.width, i), secondaryPaint);
     }
 
-    // Add background gears
+    // Draw coordinate crosses at major tech intersections
+    final markerPaint = Paint()
+      ..color = gridColor.withOpacity(gridColor.opacity * 3.5)
+      ..strokeWidth = 1.0;
+    for (double x = 0; x < size.width; x += spacing * 4) {
+      for (
+        double y = (offset * 4) % (spacing * 4);
+        y < size.height;
+        y += spacing * 4
+      ) {
+        // Draw crisp HUD cross
+        canvas.drawLine(Offset(x - 4, y), Offset(x + 4, y), markerPaint);
+        canvas.drawLine(Offset(x, y - 4), Offset(x, y + 4), markerPaint);
+      }
+    }
+
+    // Add background rotating tech gears
     _drawGear(
       canvas,
-      const Offset(50, 100),
-      80,
-      animValue * 0.5,
-      gridColor.withOpacity(0.08),
-    );
-    _drawGear(
-      canvas,
-      Offset(size.width - 40, size.height * 0.4),
-      120,
-      -animValue * 0.3,
+      const Offset(60, 120),
+      70,
+      animValue * 0.4,
       gridColor.withOpacity(0.06),
     );
     _drawGear(
       canvas,
-      Offset(80, size.height * 0.7),
-      60,
-      animValue * 0.8,
+      Offset(size.width - 60, size.height * 0.45),
+      110,
+      -animValue * 0.25,
       gridColor.withOpacity(0.05),
+    );
+    _drawGear(
+      canvas,
+      Offset(90, size.height * 0.75),
+      50,
+      animValue * 0.6,
+      gridColor.withOpacity(0.04),
     );
   }
 
@@ -2800,11 +2845,10 @@ class _ModernJourneyNode extends StatelessWidget {
           height: 90,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            // Optimized shadows for Impeller stability
             boxShadow: isCurrent
                 ? [
                     BoxShadow(
-                      color: const Color(0xFFFFD600).withOpacity(0.2),
+                      color: const Color(0xFFFF9800).withOpacity(0.25),
                       blurRadius: 20,
                       spreadRadius: 4,
                     ),
@@ -2849,29 +2893,33 @@ class _BoltNodePainter extends CustomPainter {
     // 1. Bolt Outer Ring
     final ringPaint = Paint()
       ..color = isCurrent
-          ? const Color(0xFFFFD600).withOpacity(0.5) // Updated to Cyan
-          : Colors.white.withOpacity(0.1)
+          ? const Color(0xFFFF9800).withOpacity(0.55)
+          : Colors.white.withOpacity(0.12)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2;
     canvas.drawCircle(center, radius, ringPaint);
 
-    // 2. Bolt Head (Aged Metal / Polished Copper)
+    // 2. Bolt Head (Copper/Bronze or Orange Core)
     final headPaint = Paint()
       ..shader = RadialGradient(
         center: const Alignment(-0.3, -0.3),
         colors: isUnlocked
             ? (isCurrent
                   ? [
-                      const Color(0xFFFFD180), // Bright Warm Amber highlight
-                      const Color(0xFFFFAB00), // Pure Rich Gold Ember
-                      const Color(0xFFE65100), // Deep Furnace Base
+                      const Color(0xFFFFF8E1), // Golden amber highlight
+                      const Color(0xFFFF9800), // Rich industrial orange
+                      const Color(0xFF3E2723), // Copper brown base
                     ]
                   : [
-                      const Color(0xFF8D8D8D),
-                      const Color(0xFF424242),
-                      const Color(0xFF1B1B1B),
+                      const Color(0xFFFFD180), // Golden copper highlights
+                      const Color(0xFFE65100), // Rich dark copper
+                      const Color(0xFF1B0C00), // Smelter base
                     ])
-            : [const Color(0xFF2A2A2A), const Color(0xFF1A1A1A), Colors.black],
+            : [
+                const Color(0xFF212530), // Locked titanium
+                const Color(0xFF151821),
+                Colors.black,
+              ],
       ).createShader(Rect.fromCircle(center: center, radius: radius - 5));
 
     canvas.drawCircle(center, radius - 5, headPaint);
@@ -2880,8 +2928,8 @@ class _BoltNodePainter extends CustomPainter {
     final hexPath = Path();
     for (var i = 0; i < 6; i++) {
       final angle = (i * 60) * math.pi / 180;
-      final x = center.dx + (radius * 0.7) * math.cos(angle);
-      final y = center.dy + (radius * 0.7) * math.sin(angle);
+      final x = center.dx + (radius * 0.65) * math.cos(angle);
+      final y = center.dy + (radius * 0.65) * math.sin(angle);
       if (i == 0)
         hexPath.moveTo(x, y);
       else
@@ -2890,23 +2938,25 @@ class _BoltNodePainter extends CustomPainter {
     hexPath.close();
 
     final hexPaint = Paint()
-      ..color = Colors.black.withOpacity(0.3)
+      ..color = isCurrent
+          ? const Color(0xFFFF9800).withOpacity(0.35)
+          : Colors.black.withOpacity(0.35)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
+      ..strokeWidth = 1.2;
     canvas.drawPath(hexPath, hexPaint);
 
     // 4. Philip Slot (Cross)
     final slotPaint = Paint()
       ..color = isCurrent
-          ? Colors.white.withOpacity(0.9)
+          ? Colors.white.withOpacity(0.95)
           : (isUnlocked
                 ? Colors.black.withOpacity(0.8)
                 : Colors.black.withOpacity(0.4))
       ..strokeWidth = radius * 0.12
       ..strokeCap = StrokeCap.round;
 
-    final slotLen = radius * 0.4;
-    final rotation = isCurrent ? animValue * math.pi * 0.2 : 0.0;
+    final slotLen = radius * 0.35;
+    final rotation = isCurrent ? animValue * math.pi * 0.25 : 0.0;
 
     canvas.save();
     canvas.translate(center.dx, center.dy);
@@ -2919,11 +2969,11 @@ class _BoltNodePainter extends CustomPainter {
     if (isComingSoon) {
       final textPainter = TextPainter(
         text: TextSpan(
-          text: "COMING\nSOON",
+          text: LangService.t('main_coming_soon'),
           style: TextStyle(
             color: Colors.white.withOpacity(0.3),
-            fontSize: 10,
-            height: 1.0,
+            fontSize: 9,
+            height: 1.1,
             letterSpacing: 1.0,
             fontWeight: FontWeight.w900,
             fontFamily: 'monospace',
@@ -2942,29 +2992,41 @@ class _BoltNodePainter extends CustomPainter {
     if (isUnlocked) {
       final badgeRect = Rect.fromCenter(
         center: center + Offset(0, radius + 15),
-        width: radius * 1.2,
+        width: radius * 1.3,
         height: 20,
       );
 
       // Badge Background
       final badgePaint = Paint()
         ..color = isCurrent
-            ? const Color(0xFFFFD600) // Updated to Cyan
-            : Colors.black.withOpacity(0.5)
+            ? const Color(0xFFFF9800)
+            : const Color(0xFF141414).withOpacity(0.8)
         ..style = PaintingStyle.fill;
 
       canvas.drawRRect(
-        RRect.fromRectAndRadius(badgeRect, const Radius.circular(4)),
+        RRect.fromRectAndRadius(badgeRect, const Radius.circular(6)),
         badgePaint,
+      );
+
+      // Badge Border
+      final badgeBorder = Paint()
+        ..color = isCurrent
+            ? const Color(0xFFFF9800)
+            : const Color(0xFFFF9800).withOpacity(0.2)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0;
+
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(badgeRect, const Radius.circular(6)),
+        badgeBorder,
       );
 
       if (isCurrent) {
         final badgeGlow = Paint()
-          ..color = const Color(0xFFFFD600)
-              .withOpacity(0.3) // Updated to Cyan
+          ..color = const Color(0xFFFF9800).withOpacity(0.3)
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
         canvas.drawRRect(
-          RRect.fromRectAndRadius(badgeRect, const Radius.circular(4)),
+          RRect.fromRectAndRadius(badgeRect, const Radius.circular(6)),
           badgeGlow,
         );
       }
@@ -2973,10 +3035,10 @@ class _BoltNodePainter extends CustomPainter {
         text: TextSpan(
           text: level.toString().padLeft(2, '0'),
           style: TextStyle(
-            color: isCurrent ? Colors.black : Colors.white.withOpacity(0.8),
-            fontSize: 12,
+            color: isCurrent ? Colors.black : const Color(0xFFFF9800),
+            fontSize: 11,
             fontWeight: FontWeight.w900,
-            fontFamily: 'Courier',
+            fontFamily: 'monospace',
           ),
         ),
         textDirection: TextDirection.ltr,
@@ -2990,15 +3052,21 @@ class _BoltNodePainter extends CustomPainter {
             ),
       );
     } else {
-      // Locked Icon
+      // Locked Icon (Futuristic Neon Red lock)
       final iconPainter = TextPainter(
         text: TextSpan(
           text: String.fromCharCode(Icons.lock_outline_rounded.codePoint),
           style: TextStyle(
-            fontSize: 20,
+            fontSize: 22,
             fontFamily: Icons.lock_outline_rounded.fontFamily,
             package: Icons.lock_outline_rounded.fontPackage,
-            color: Colors.white.withOpacity(0.2),
+            color: const Color(0xFFEF5350).withOpacity(0.4),
+            shadows: [
+              Shadow(
+                color: const Color(0xFFEF5350).withOpacity(0.6),
+                blurRadius: 8,
+              ),
+            ],
           ),
         ),
         textDirection: TextDirection.ltr,
@@ -3009,14 +3077,19 @@ class _BoltNodePainter extends CustomPainter {
       );
     }
 
-    // 6. Current Scanning Ring
+    // 6. Current Scanning Ring - Double-Layer scan
     if (isCurrent) {
       final scanPaint = Paint()
-        ..color = const Color(0xFFFFD600)
-            .withOpacity(0.6 * (1.0 - animValue)) // Updated to Cyan
+        ..color = const Color(0xFFFF9800).withOpacity(0.7 * (1.0 - animValue))
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 3;
-      canvas.drawCircle(center, radius + 5 + (animValue * 15), scanPaint);
+        ..strokeWidth = 2;
+      canvas.drawCircle(center, radius + 4 + (animValue * 14), scanPaint);
+
+      final scanPaint2 = Paint()
+        ..color = const Color(0xFFFF9800).withOpacity(0.3 * animValue)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0;
+      canvas.drawCircle(center, radius + 14 - (animValue * 8), scanPaint2);
     }
   }
 
@@ -3042,7 +3115,7 @@ class _ModernPathPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (isComingSoon) return; // Don't draw path to Coming Soon node yet
+    if (isComingSoon) return;
 
     final path = Path()
       ..moveTo(start.dx, start.dy)
@@ -3050,10 +3123,10 @@ class _ModernPathPainter extends CustomPainter {
 
     final basePaint = Paint()
       ..color = isUnlocked
-          ? const Color(0xFFFFD600).withOpacity(0.15) // Updated to Cyan
-          : Colors.white.withOpacity(0.03)
+          ? const Color(0xFFFF9800).withOpacity(0.18) // Faint Industrial Orange laser beam
+          : Colors.white.withOpacity(0.04)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 8
+      ..strokeWidth = 6
       ..strokeCap = StrokeCap.round;
 
     canvas.drawPath(path, basePaint);
@@ -3062,9 +3135,9 @@ class _ModernPathPainter extends CustomPainter {
       final energyPaint = Paint()
         ..shader = LinearGradient(
           colors: [
-            const Color(0xFFFFD600).withOpacity(0.0), // Updated to Cyan
-            const Color(0xFFFFD600),
-            const Color(0xFFFFD600).withOpacity(0.0),
+            const Color(0xFFFF9800).withOpacity(0.0),
+            const Color(0xFFFF9800),
+            const Color(0xFFFF9800).withOpacity(0.0),
           ],
           stops: const [0.0, 0.5, 1.0],
         ).createShader(Rect.fromPoints(start, end))
@@ -3072,10 +3145,9 @@ class _ModernPathPainter extends CustomPainter {
         ..strokeWidth = 3
         ..strokeCap = StrokeCap.round;
 
-      // Pulse animation along the path
       final metrics = path.computeMetrics().first;
       final totalLen = metrics.length;
-      final dashLen = 40.0;
+      final dashLen = 50.0;
       final currentPos = (animValue * totalLen) % totalLen;
 
       final extract = metrics.extractPath(
@@ -3084,7 +3156,6 @@ class _ModernPathPainter extends CustomPainter {
       );
       canvas.drawPath(extract, energyPaint);
 
-      // If it wraps around
       if (currentPos + dashLen > totalLen) {
         final wrapExtract = metrics.extractPath(
           0,
@@ -3111,29 +3182,29 @@ class _ModernPlayButton extends StatelessWidget {
     return GestureDetector(
       onTap: onPressed,
       child: Container(
-        width: 280,
-        height: 70,
+        width: 290,
+        height: 64,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(35),
+          borderRadius: BorderRadius.circular(32),
           gradient: const LinearGradient(
             colors: [
-              Color(0xFFFF3D00),
-              Color(0xFFFFAB00),
-            ], // Harmonized Heat Gradient
+              Color(0xFFFF9800), // Industrial Orange
+              Color(0xFFE65100), // Rich Rust / Dark Orange
+            ],
             begin: Alignment.centerLeft,
             end: Alignment.centerRight,
           ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFFFD600).withOpacity(0.3), // Warm Glow
-              blurRadius: 20,
-              offset: const Offset(0, 10),
+              color: const Color(0xFFFF9800).withOpacity(0.35), // Glowing orange aura
+              blurRadius: 25,
+              offset: const Offset(0, 8),
             ),
           ],
-          border: Border.all(color: Colors.white.withOpacity(0.2), width: 1.5),
+          border: Border.all(color: Colors.white.withOpacity(0.3), width: 1.5),
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(35),
+          borderRadius: BorderRadius.circular(32),
           child: Stack(
             children: [
               Positioned.fill(
@@ -3144,26 +3215,26 @@ class _ModernPlayButton extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(6),
                       decoration: const BoxDecoration(
                         color: Colors.white,
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
                         Icons.play_arrow_rounded,
-                        color: Color(0xFFFF3D00), // Warm Heat Icon
-                        size: 24,
+                        color: Color(0xFFE65100),
+                        size: 22,
                       ),
                     ),
-                    const SizedBox(width: 15),
+                    const SizedBox(width: 12),
                     Text(
                       '${LangService.t('main_play')} ${level.toString().padLeft(2, '0')}',
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 16,
+                        fontSize: 14,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 1.5,
-                        fontFamily: 'Courier',
+                        fontFamily: 'monospace',
                       ),
                     ),
                   ],
@@ -3181,13 +3252,10 @@ class _ButtonPatternPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white
-          .withOpacity(
-            0.2,
-          ) // Handled directly in painter for Impeller stability
-      ..strokeWidth = 1;
-    for (double i = 0; i < size.width; i += 10) {
-      canvas.drawLine(Offset(i, 0), Offset(i - 20, size.height), paint);
+      ..color = Colors.white.withOpacity(0.12)
+      ..strokeWidth = 1.5;
+    for (double i = 0; i < size.width + size.height; i += 12) {
+      canvas.drawLine(Offset(i, 0), Offset(i - 24, size.height), paint);
     }
   }
 
@@ -3201,14 +3269,17 @@ class AdConfirmationOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isBoosterAd = game.pendingAdBooster != null;
+    return ValueListenableBuilder<String>(
+      valueListenable: LangService().localeNotifier,
+      builder: (context, locale, _) {
+        final isBoosterAd = game.pendingAdBooster != null;
 
-    final titleText = isBoosterAd
-        ? 'REFILL ${game.pendingAdBooster}'
-        : 'UNLOCK SLOT';
-    final descText = isBoosterAd
-        ? 'Watch a short video to instantly claim +1 ${game.pendingAdBooster} booster charge.'
-        : 'Watch a short video to gain permanent access to this industrial slot.';
+        final titleText = isBoosterAd
+            ? LangService.t('ad_refill_booster').replaceAll('{booster}', game.pendingAdBooster ?? '')
+            : LangService.t('ad_unlock_slot');
+        final descText = isBoosterAd
+            ? LangService.t('ad_refill_desc').replaceAll('{booster}', game.pendingAdBooster ?? '')
+            : LangService.t('ad_unlock_desc');
 
     IconData displayIcon = Icons.lock_open_rounded;
     if (isBoosterAd) {
@@ -3311,7 +3382,7 @@ class AdConfirmationOverlay extends StatelessWidget {
                       children: [
                         Expanded(
                           child: _buildButton(
-                            label: 'CANCEL',
+                            label: LangService.t('ad_cancel'),
                             isPrimary: false,
                             onPressed: () {
                               game.overlays.remove('AdConfirmation');
@@ -3323,7 +3394,7 @@ class AdConfirmationOverlay extends StatelessWidget {
                         const SizedBox(width: 12),
                         Expanded(
                           child: _buildButton(
-                            label: 'WATCH AD',
+                            label: LangService.t('ad_watch'),
                             isPrimary: true,
                             onPressed: () {
                               game.overlays.remove('AdConfirmation');
@@ -3379,6 +3450,8 @@ class AdConfirmationOverlay extends StatelessWidget {
         ),
       ],
     );
+      },
+    );
   }
 
   Widget _buildButton({
@@ -3418,34 +3491,39 @@ class LoadingOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: Colors.black.withOpacity(0.8),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(
-              width: 50,
-              height: 50,
-              child: CircularProgressIndicator(
-                color: Color(0xFFFF9800),
-                strokeWidth: 4,
-              ),
+    return ValueListenableBuilder<String>(
+      valueListenable: LangService().localeNotifier,
+      builder: (context, locale, _) {
+        return Container(
+          color: Colors.black.withOpacity(0.8),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(
+                  width: 50,
+                  height: 50,
+                  child: CircularProgressIndicator(
+                    color: Color(0xFFFF9800),
+                    strokeWidth: 4,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  LangService.t('ad_loading'),
+                  style: TextStyle(
+                    color: const Color(0xFFFF9800).withOpacity(0.8),
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 2,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 24),
-            Text(
-              'LOADING SECURE AD STREAM...',
-              style: TextStyle(
-                color: const Color(0xFFFF9800).withOpacity(0.8),
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 2,
-                fontFamily: 'monospace',
-              ),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -3483,164 +3561,169 @@ class _SettingsMenuState extends State<SettingsMenu> {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        // 1. Efficient Dimensional Overlay (No Blur overhead)
-        Positioned.fill(
-          child: Container(color: Colors.black.withOpacity(0.85)),
-        ),
-        // 2. Kinetic Dialog Body
-        Center(
-          child: TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0.8, end: 1.0),
-            duration: const Duration(milliseconds: 350),
-            curve: Curves.easeOutBack,
-            builder: (context, scale, child) =>
-                Transform.scale(scale: scale, child: child),
-            child: Container(
-              width: 330,
-              padding: const EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    const Color(0xFFFF9800).withOpacity(0.6),
-                    const Color(0xFF1A1A1A),
-                    const Color(0xFFFF9800).withOpacity(0.2),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.8),
-                    blurRadius: 40,
-                    spreadRadius: 10,
+    return ValueListenableBuilder<String>(
+      valueListenable: LangService().localeNotifier,
+      builder: (context, locale, _) {
+        return Stack(
+          children: [
+            // 1. Efficient Dimensional Overlay (No Blur overhead)
+            Positioned.fill(
+              child: Container(color: Colors.black.withOpacity(0.85)),
+            ),
+            // 2. Kinetic Dialog Body
+            Center(
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.8, end: 1.0),
+                duration: const Duration(milliseconds: 350),
+                curve: Curves.easeOutBack,
+                builder: (context, scale, child) =>
+                    Transform.scale(scale: scale, child: child),
+                child: Container(
+                  width: 330,
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        const Color(0xFFFF9800).withOpacity(0.6),
+                        const Color(0xFF1A1A1A),
+                        const Color(0xFFFF9800).withOpacity(0.2),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.8),
+                        blurRadius: 40,
+                        spreadRadius: 10,
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF141414), // Pure industrial dark
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // HEADER
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  child: Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF141414), // Pure industrial dark
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          LangService.t('sett_title'),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                            fontFamily: 'Courier',
-                            letterSpacing: 1.5,
+                        // HEADER
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              LangService.t('sett_title'),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                                fontFamily: 'Courier',
+                                letterSpacing: 1.5,
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () =>
+                                  widget.game.overlays.remove('SettingsMenu'),
+                              icon: const Icon(
+                                Icons.close_rounded,
+                                color: Colors.white60,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Divider(color: Colors.white10, height: 1),
+                        const SizedBox(height: 24),
+    
+                        // SETTINGS CATEGORY 1: SOUND & LOCALIZATION
+                        _buildSettingsHeader(LangService.t('sett_module_controls')),
+                        const SizedBox(height: 8),
+                        _buildToggleItem(
+                          icon: Icons.music_note_rounded,
+                          title: LangService.t('sett_bgm_title'),
+                          subtitle: LangService.t('sett_bgm_subtitle'),
+                          value: _bgmEnabled,
+                          onChanged: (val) async {
+                            setState(() => _bgmEnabled = val);
+                            await widget.game.audio.setBgmEnabled(val);
+                            widget.game.audio.playBoosterClick();
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        _buildToggleItem(
+                          icon: Icons.volume_up_rounded,
+                          title: LangService.t('sett_sfx_title'),
+                          subtitle: LangService.t('sett_sfx_subtitle'),
+                          value: _sfxEnabled,
+                          onChanged: (val) async {
+                            setState(() => _sfxEnabled = val);
+                            await widget.game.audio.setSfxEnabled(val);
+                            widget.game.audio.playBoosterClick();
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        // NEW: PREMIUM GLOBAL LANGUAGE SELECTOR
+                        _buildNavTile(
+                          icon: Icons.language_rounded,
+                          title:
+                              '${LangService.t('sett_language')}: ${LangService.t('sett_lang_display').toUpperCase()}',
+                          onTap: () {
+                            widget.game.audio.playBoosterClick();
+                            _showLanguageSelector(context);
+                          },
+                        ),
+    
+                        const SizedBox(height: 24),
+                        const Divider(color: Colors.white10, height: 1),
+                        const SizedBox(height: 24),
+    
+                        // SETTINGS CATEGORY 2: LEGAL & INFO
+                        _buildSettingsHeader(LangService.t('sett_documentation')),
+                        const SizedBox(height: 8),
+                        _buildNavTile(
+                          icon: Icons.privacy_tip_outlined,
+                          title: LangService.t('sett_privacy'),
+                          onTap: () => _launchURL(
+                            'https://eamonstudio.com/boltforge/privacy-policy',
                           ),
                         ),
-                        IconButton(
-                          onPressed: () =>
-                              widget.game.overlays.remove('SettingsMenu'),
-                          icon: const Icon(
-                            Icons.close_rounded,
-                            color: Colors.white60,
+                        _buildNavTile(
+                          icon: Icons.article_outlined,
+                          title: LangService.t('sett_terms'),
+                          onTap: () => _launchURL(
+                            'https://eamonstudio.com/boltforge/terms-of-service',
+                          ),
+                        ),
+                        _buildNavTile(
+                          icon: Icons.info_outline_rounded,
+                          title: LangService.t('sett_about'),
+                          onTap: () =>
+                              _launchURL('https://eamonstudio.com/boltforge'),
+                        ),
+    
+                        const SizedBox(height: 32),
+    
+                        // FOOTER TELEMETRY
+                        Text(
+                          '${LangService.t('sett_version')}: 1.0.5-BETA',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.2),
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'monospace',
+                            letterSpacing: 1,
                           ),
                         ),
                       ],
                     ),
-                    const Divider(color: Colors.white10, height: 1),
-                    const SizedBox(height: 24),
-
-                    // SETTINGS CATEGORY 1: SOUND & LOCALIZATION
-                    _buildSettingsHeader(LangService.t('sett_module_controls')),
-                    const SizedBox(height: 8),
-                    _buildToggleItem(
-                      icon: Icons.music_note_rounded,
-                      title: LangService.t('sett_bgm_title'),
-                      subtitle: LangService.t('sett_bgm_subtitle'),
-                      value: _bgmEnabled,
-                      onChanged: (val) async {
-                        setState(() => _bgmEnabled = val);
-                        await widget.game.audio.setBgmEnabled(val);
-                        widget.game.audio.playBoosterClick();
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    _buildToggleItem(
-                      icon: Icons.volume_up_rounded,
-                      title: LangService.t('sett_sfx_title'),
-                      subtitle: LangService.t('sett_sfx_subtitle'),
-                      value: _sfxEnabled,
-                      onChanged: (val) async {
-                        setState(() => _sfxEnabled = val);
-                        await widget.game.audio.setSfxEnabled(val);
-                        widget.game.audio.playBoosterClick();
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    // NEW: PREMIUM GLOBAL LANGUAGE SELECTOR
-                    _buildNavTile(
-                      icon: Icons.language_rounded,
-                      title:
-                          '${LangService.t('sett_language')}: ${LangService.t('sett_lang_display').toUpperCase()}',
-                      onTap: () {
-                        widget.game.audio.playBoosterClick();
-                        _showLanguageSelector(context);
-                      },
-                    ),
-
-                    const SizedBox(height: 24),
-                    const Divider(color: Colors.white10, height: 1),
-                    const SizedBox(height: 24),
-
-                    // SETTINGS CATEGORY 2: LEGAL & INFO
-                    _buildSettingsHeader(LangService.t('sett_documentation')),
-                    const SizedBox(height: 8),
-                    _buildNavTile(
-                      icon: Icons.privacy_tip_outlined,
-                      title: LangService.t('sett_privacy'),
-                      onTap: () => _launchURL(
-                        'https://eamonstudio.com/boltforge/privacy-policy',
-                      ),
-                    ),
-                    _buildNavTile(
-                      icon: Icons.article_outlined,
-                      title: LangService.t('sett_terms'),
-                      onTap: () => _launchURL(
-                        'https://eamonstudio.com/boltforge/terms-of-service',
-                      ),
-                    ),
-                    _buildNavTile(
-                      icon: Icons.info_outline_rounded,
-                      title: LangService.t('sett_about'),
-                      onTap: () =>
-                          _launchURL('https://eamonstudio.com/boltforge'),
-                    ),
-
-                    const SizedBox(height: 32),
-
-                    // FOOTER TELEMETRY
-                    Text(
-                      '${LangService.t('sett_version')}: 1.0.5-BETA',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.2),
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'monospace',
-                        letterSpacing: 1,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 
@@ -3932,273 +4015,278 @@ class _TutorialOverlayState extends State<TutorialOverlay>
 
   @override
   Widget build(BuildContext context) {
-    final step = widget.game.tutorialStepNotifier.value;
-    if (step == null) return const SizedBox.shrink();
-
-    String title = "";
-    String content = "";
-    String? buttonText;
-    VoidCallback? onButtonPressed;
-    Alignment alignment = const Alignment(0, 0.35);
-
-    // Pointer configurations
-    Offset? pointerPosition;
-    bool showPointer = false;
-
-    switch (step) {
-      case TutorialStep.welcome:
-        title = LangService.t('tuto_welcome_t');
-        content = LangService.t('tuto_welcome_c');
-        buttonText = LangService.t('tuto_continue');
-        onButtonPressed = () {
-          widget.game.tutorialStepNotifier.value = TutorialStep.explainTimer;
-        };
-        alignment = Alignment.center;
-        break;
-
-      case TutorialStep.explainTimer:
-        title = LangService.t('tuto_timer_t');
-        content = LangService.t('tuto_timer_c');
-        buttonText = LangService.t('tuto_continue');
-        onButtonPressed = () {
-          widget.game.tutorialStepNotifier.value = TutorialStep.selectLeftBolt;
-        };
-
-        // Calculate precise dynamic coordinates of the bottom right timer
-        final screenWidth = MediaQuery.of(context).size.width;
-        final screenHeight = MediaQuery.of(context).size.height;
-        final bottomPadding = MediaQuery.of(context).padding.bottom;
-
-        // Center perfectly over the timer digits in the bottom dock
-        final adHeight = widget.game.hasActiveBannerAd ? 50.0 : 0.0;
-        final timerX = screenWidth - 85;
-        final timerY = screenHeight - (65 + bottomPadding + adHeight);
-
-        pointerPosition = Offset(timerX, timerY);
-        showPointer = true;
-        alignment = const Alignment(
-          0,
-          -0.1,
-        ); // Raised up so it doesn't overlap with the pointer and timer
-        break;
-
-      case TutorialStep.selectLeftBolt:
-        title = LangService.t('tuto_sel_left_t');
-        content = LangService.t('tuto_sel_left_c');
-        pointerPosition = _getWorldToScreen(Vector2(-2.0, 18.0));
-        showPointer = true;
-        break;
-
-      case TutorialStep.moveLeftBolt:
-        title = LangService.t('tuto_mov_left_t');
-        content = LangService.t('tuto_mov_left_c');
-        pointerPosition = _getWorldToScreen(Vector2(-1.0, 21.5));
-        showPointer = true;
-        break;
-
-      case TutorialStep.selectRightBolt:
-        title = LangService.t('tuto_sel_right_t');
-        content = LangService.t('tuto_sel_right_c');
-        pointerPosition = _getWorldToScreen(Vector2(2.0, 18.0));
-        showPointer = true;
-        break;
-
-      case TutorialStep.moveRightBolt:
-        title = LangService.t('tuto_mov_right_t');
-        content = LangService.t('tuto_mov_right_c');
-        pointerPosition = _getWorldToScreen(Vector2(1.0, 21.5));
-        showPointer = true;
-        break;
-
-      case TutorialStep.explainSwing:
-        title = LangService.t('tuto_swing_t');
-        content = LangService.t('tuto_swing_c');
-        buttonText = LangService.t('tuto_continue');
-        onButtonPressed = () {
-          widget.game.tutorialStepNotifier.value =
-              TutorialStep.selectCenterBolt;
-        };
-        break;
-
-      case TutorialStep.selectCenterBolt:
-        title = LangService.t('tuto_sel_cent_t');
-        content = LangService.t('tuto_sel_cent_c');
-        pointerPosition = _getWorldToScreen(Vector2(0.0, 18.0));
-        showPointer = true;
-        break;
-
-      case TutorialStep.moveCenterBolt:
-        title = LangService.t('tuto_mov_cent_t');
-        content = LangService.t('tuto_mov_cent_c');
-        // Point to the left upper vacated hole
-        pointerPosition = _getWorldToScreen(Vector2(-2.0, 18.0));
-        showPointer = true;
-        break;
-
-      case TutorialStep.explainRust:
-        title = LangService.t('tuto_rust_t');
-        content = LangService.t('tuto_rust_c');
-        pointerPosition = _getWorldToScreen(
-          Vector2(-2.0, 20.0),
-        ); // Point straight to top-left rusty bolt
-        showPointer = true;
-        alignment = const Alignment(
-          0,
-          0.5,
-        ); // Position box BEAUTIFULLY near bottom!
-        break;
-
-      case TutorialStep.selectTutorialRustBolt:
-        title = LangService.t('tuto_free_t');
-        content = LangService.t('tuto_free_c');
-        pointerPosition = _getWorldToScreen(
-          Vector2(-2.0, 20.0),
-        ); // Point to target cleared bolt
-        showPointer = true;
-        alignment = const Alignment(0, 0.5);
-        break;
-
-      case TutorialStep.moveTutorialRustBolt:
-        title = LangService.t('tuto_move_t');
-        content = LangService.t('tuto_move_c');
-        pointerPosition = _getWorldToScreen(
-          Vector2(-2.0, 18.0),
-        ); // Point to target hole
-        showPointer = true;
-        alignment = const Alignment(0, 0.5);
-        break;
-
-      case TutorialStep.introBoosters:
-        title = LangService.t('tuto_intro_t');
-        content = LangService.t('tuto_intro_c');
-        buttonText = LangService.t('tuto_intro_b');
-        onButtonPressed = () {
-          widget.game.tutorialStepNotifier.value = TutorialStep.tryStorm;
-        };
-        alignment = Alignment.center;
-        break;
-
-      case TutorialStep.tryStorm:
-        title = LangService.t('tuto_storm_t');
-        content = LangService.t('tuto_storm_c');
-        {
-          final screenHeight = MediaQuery.of(context).size.height;
-          final bottomPadding = MediaQuery.of(context).padding.bottom;
-          final adHeight = widget.game.hasActiveBannerAd ? 50.0 : 0.0;
-          pointerPosition = Offset(
-            207,
-            screenHeight - (70 + adHeight + bottomPadding),
-          );
-          showPointer = true;
-          alignment = const Alignment(0, -0.15);
-        }
-        break;
-
-      case TutorialStep.explainSmash:
-        title = LangService.t('tuto_smash_t');
-        content = LangService.t('tuto_smash_c');
-        buttonText = LangService.t('tuto_smash_b');
-        onButtonPressed = () {
-          widget.game.tutorialStepNotifier.value = TutorialStep.trySmash;
-        };
-        alignment = Alignment.center;
-        break;
-
-      case TutorialStep.trySmash:
-        title = LangService.t('tuto_smash_t');
-        content = LangService.t('tuto_smash_try_c');
-        {
-          final screenHeight = MediaQuery.of(context).size.height;
-          final bottomPadding = MediaQuery.of(context).padding.bottom;
-          final adHeight = widget.game.hasActiveBannerAd ? 50.0 : 0.0;
-          pointerPosition = Offset(
-            137,
-            screenHeight - (70 + adHeight + bottomPadding),
-          );
-          showPointer = true;
-          alignment = const Alignment(0, -0.15);
-        }
-        break;
-
-      case TutorialStep.explainChronos:
-        title = LangService.t('tuto_chronos_t');
-        content = LangService.t('tuto_chronos_c');
-        buttonText = LangService.t('tuto_chronos_b');
-        onButtonPressed = () {
-          widget.game.tutorialStepNotifier.value = TutorialStep.tryChronos;
-        };
-        alignment = Alignment.center;
-        break;
-
-      case TutorialStep.tryChronos:
-        title = LangService.t('tuto_chronos_t');
-        content = LangService.t('tuto_chronos_try_c');
-        {
-          final screenHeight = MediaQuery.of(context).size.height;
-          final bottomPadding = MediaQuery.of(context).padding.bottom;
-          final adHeight = widget.game.hasActiveBannerAd ? 50.0 : 0.0;
-          pointerPosition = Offset(
-            67,
-            screenHeight - (70 + adHeight + bottomPadding),
-          );
-          showPointer = true;
-          alignment = const Alignment(0, -0.15);
-        }
-        break;
-    }
-
-    return Stack(
-      children: [
-        // Full screen backdrop blur (ONLY for non-interactive welcome/explanation steps)
-        if (step == TutorialStep.welcome ||
-            step == TutorialStep.introBoosters ||
-            step == TutorialStep.explainSmash ||
-            step == TutorialStep.explainChronos)
-          Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-              child: Container(color: Colors.black.withOpacity(0.6)),
-            ),
-          ),
-
-        // Premium Dialog Box (Wrapped to show live, real-time manual tap counters!)
-        ValueListenableBuilder<int>(
-          valueListenable: widget.game.rustTutorialHitsNotifier,
-          builder: (context, hits, _) {
-            String finalContent = content;
-
-            // DYNAMIC HUD UPDATE: Refresh the text with exact clicks remaining!
-            if (step == TutorialStep.explainRust) {
-              finalContent =
-                  "${LangService.t('tuto_rust_c')}\n\n🎯 **${LangService.t('tuto_rust_hits')}: $hits / 6**";
+    return ValueListenableBuilder<String>(
+      valueListenable: LangService().localeNotifier,
+      builder: (context, locale, _) {
+        final step = widget.game.tutorialStepNotifier.value;
+        if (step == null) return const SizedBox.shrink();
+    
+        String title = "";
+        String content = "";
+        String? buttonText;
+        VoidCallback? onButtonPressed;
+        Alignment alignment = const Alignment(0, 0.35);
+    
+        // Pointer configurations
+        Offset? pointerPosition;
+        bool showPointer = false;
+    
+        switch (step) {
+          case TutorialStep.welcome:
+            title = LangService.t('tuto_welcome_t');
+            content = LangService.t('tuto_welcome_c');
+            buttonText = LangService.t('tuto_continue');
+            onButtonPressed = () {
+              widget.game.tutorialStepNotifier.value = TutorialStep.explainTimer;
+            };
+            alignment = Alignment.center;
+            break;
+    
+          case TutorialStep.explainTimer:
+            title = LangService.t('tuto_timer_t');
+            content = LangService.t('tuto_timer_c');
+            buttonText = LangService.t('tuto_continue');
+            onButtonPressed = () {
+              widget.game.tutorialStepNotifier.value = TutorialStep.selectLeftBolt;
+            };
+    
+            // Calculate precise dynamic coordinates of the bottom right timer
+            final screenWidth = MediaQuery.of(context).size.width;
+            final screenHeight = MediaQuery.of(context).size.height;
+            final bottomPadding = MediaQuery.of(context).padding.bottom;
+    
+            // Center perfectly over the timer digits in the bottom dock
+            final adHeight = widget.game.hasActiveBannerAd ? 50.0 : 0.0;
+            final timerX = screenWidth - 85;
+            final timerY = screenHeight - (65 + bottomPadding + adHeight);
+    
+            pointerPosition = Offset(timerX, timerY);
+            showPointer = true;
+            alignment = const Alignment(
+              0,
+              -0.1,
+            ); // Raised up so it doesn't overlap with the pointer and timer
+            break;
+    
+          case TutorialStep.selectLeftBolt:
+            title = LangService.t('tuto_sel_left_t');
+            content = LangService.t('tuto_sel_left_c');
+            pointerPosition = _getWorldToScreen(Vector2(-2.0, 18.0));
+            showPointer = true;
+            break;
+    
+          case TutorialStep.moveLeftBolt:
+            title = LangService.t('tuto_mov_left_t');
+            content = LangService.t('tuto_mov_left_c');
+            pointerPosition = _getWorldToScreen(Vector2(-1.0, 21.5));
+            showPointer = true;
+            break;
+    
+          case TutorialStep.selectRightBolt:
+            title = LangService.t('tuto_sel_right_t');
+            content = LangService.t('tuto_sel_right_c');
+            pointerPosition = _getWorldToScreen(Vector2(2.0, 18.0));
+            showPointer = true;
+            break;
+    
+          case TutorialStep.moveRightBolt:
+            title = LangService.t('tuto_mov_right_t');
+            content = LangService.t('tuto_mov_right_c');
+            pointerPosition = _getWorldToScreen(Vector2(1.0, 21.5));
+            showPointer = true;
+            break;
+    
+          case TutorialStep.explainSwing:
+            title = LangService.t('tuto_swing_t');
+            content = LangService.t('tuto_swing_c');
+            buttonText = LangService.t('tuto_continue');
+            onButtonPressed = () {
+              widget.game.tutorialStepNotifier.value =
+                  TutorialStep.selectCenterBolt;
+            };
+            break;
+    
+          case TutorialStep.selectCenterBolt:
+            title = LangService.t('tuto_sel_cent_t');
+            content = LangService.t('tuto_sel_cent_c');
+            pointerPosition = _getWorldToScreen(Vector2(0.0, 18.0));
+            showPointer = true;
+            break;
+    
+          case TutorialStep.moveCenterBolt:
+            title = LangService.t('tuto_mov_cent_t');
+            content = LangService.t('tuto_mov_cent_c');
+            // Point to the left upper vacated hole
+            pointerPosition = _getWorldToScreen(Vector2(-2.0, 18.0));
+            showPointer = true;
+            break;
+    
+          case TutorialStep.explainRust:
+            title = LangService.t('tuto_rust_t');
+            content = LangService.t('tuto_rust_c');
+            pointerPosition = _getWorldToScreen(
+              Vector2(-2.0, 20.0),
+            ); // Point straight to top-left rusty bolt
+            showPointer = true;
+            alignment = const Alignment(
+              0,
+              0.5,
+            ); // Position box BEAUTIFULLY near bottom!
+            break;
+    
+          case TutorialStep.selectTutorialRustBolt:
+            title = LangService.t('tuto_free_t');
+            content = LangService.t('tuto_free_c');
+            pointerPosition = _getWorldToScreen(
+              Vector2(-2.0, 20.0),
+            ); // Point to target cleared bolt
+            showPointer = true;
+            alignment = const Alignment(0, 0.5);
+            break;
+    
+          case TutorialStep.moveTutorialRustBolt:
+            title = LangService.t('tuto_move_t');
+            content = LangService.t('tuto_move_c');
+            pointerPosition = _getWorldToScreen(
+              Vector2(-2.0, 18.0),
+            ); // Point to target hole
+            showPointer = true;
+            alignment = const Alignment(0, 0.5);
+            break;
+    
+          case TutorialStep.introBoosters:
+            title = LangService.t('tuto_intro_t');
+            content = LangService.t('tuto_intro_c');
+            buttonText = LangService.t('tuto_intro_b');
+            onButtonPressed = () {
+              widget.game.tutorialStepNotifier.value = TutorialStep.tryStorm;
+            };
+            alignment = Alignment.center;
+            break;
+    
+          case TutorialStep.tryStorm:
+            title = LangService.t('tuto_storm_t');
+            content = LangService.t('tuto_storm_c');
+            {
+              final screenHeight = MediaQuery.of(context).size.height;
+              final bottomPadding = MediaQuery.of(context).padding.bottom;
+              final adHeight = widget.game.hasActiveBannerAd ? 50.0 : 0.0;
+              pointerPosition = Offset(
+                207,
+                screenHeight - (70 + adHeight + bottomPadding),
+              );
+              showPointer = true;
+              alignment = const Alignment(0, -0.15);
             }
-
-            return _TutorialDialog(
-              title: title,
-              content: finalContent,
-              alignment: alignment,
-              buttonText: buttonText,
-              onButtonPressed: onButtonPressed,
-            );
-          },
-        ),
-
-        // Pulsing pointing element on top of active bolt/hole/booster AND dialog!
-        if (showPointer &&
-            pointerPosition != null &&
-            pointerPosition != Offset.zero)
-          IgnorePointer(
-            child: _InteractivePointer(
-              position: pointerPosition,
-              controller: _animController,
-              isTimerArrow:
-                  step == TutorialStep.explainTimer ||
-                  step == TutorialStep.tryStorm ||
-                  step == TutorialStep.trySmash ||
-                  step == TutorialStep.tryChronos,
+            break;
+    
+          case TutorialStep.explainSmash:
+            title = LangService.t('tuto_smash_t');
+            content = LangService.t('tuto_smash_c');
+            buttonText = LangService.t('tuto_smash_b');
+            onButtonPressed = () {
+              widget.game.tutorialStepNotifier.value = TutorialStep.trySmash;
+            };
+            alignment = Alignment.center;
+            break;
+    
+          case TutorialStep.trySmash:
+            title = LangService.t('tuto_smash_t');
+            content = LangService.t('tuto_smash_try_c');
+            {
+              final screenHeight = MediaQuery.of(context).size.height;
+              final bottomPadding = MediaQuery.of(context).padding.bottom;
+              final adHeight = widget.game.hasActiveBannerAd ? 50.0 : 0.0;
+              pointerPosition = Offset(
+                137,
+                screenHeight - (70 + adHeight + bottomPadding),
+              );
+              showPointer = true;
+              alignment = const Alignment(0, -0.15);
+            }
+            break;
+    
+          case TutorialStep.explainChronos:
+            title = LangService.t('tuto_chronos_t');
+            content = LangService.t('tuto_chronos_c');
+            buttonText = LangService.t('tuto_chronos_b');
+            onButtonPressed = () {
+              widget.game.tutorialStepNotifier.value = TutorialStep.tryChronos;
+            };
+            alignment = Alignment.center;
+            break;
+    
+          case TutorialStep.tryChronos:
+            title = LangService.t('tuto_chronos_t');
+            content = LangService.t('tuto_chronos_try_c');
+            {
+              final screenHeight = MediaQuery.of(context).size.height;
+              final bottomPadding = MediaQuery.of(context).padding.bottom;
+              final adHeight = widget.game.hasActiveBannerAd ? 50.0 : 0.0;
+              pointerPosition = Offset(
+                67,
+                screenHeight - (70 + adHeight + bottomPadding),
+              );
+              showPointer = true;
+              alignment = const Alignment(0, -0.15);
+            }
+            break;
+        }
+    
+        return Stack(
+          children: [
+            // Full screen backdrop blur (ONLY for non-interactive welcome/explanation steps)
+            if (step == TutorialStep.welcome ||
+                step == TutorialStep.introBoosters ||
+                step == TutorialStep.explainSmash ||
+                step == TutorialStep.explainChronos)
+              Positioned.fill(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                  child: Container(color: Colors.black.withOpacity(0.6)),
+                ),
+              ),
+    
+            // Premium Dialog Box (Wrapped to show live, real-time manual tap counters!)
+            ValueListenableBuilder<int>(
+              valueListenable: widget.game.rustTutorialHitsNotifier,
+              builder: (context, hits, _) {
+                String finalContent = content;
+    
+                // DYNAMIC HUD UPDATE: Refresh the text with exact clicks remaining!
+                if (step == TutorialStep.explainRust) {
+                  finalContent =
+                      "${LangService.t('tuto_rust_c')}\n\n🎯 **${LangService.t('tuto_rust_hits')}: $hits / 6**";
+                }
+    
+                return _TutorialDialog(
+                  title: title,
+                  content: finalContent,
+                  alignment: alignment,
+                  buttonText: buttonText,
+                  onButtonPressed: onButtonPressed,
+                );
+              },
             ),
-          ),
-      ],
+    
+            // Pulsing pointing element on top of active bolt/hole/booster AND dialog!
+            if (showPointer &&
+                pointerPosition != null &&
+                pointerPosition != Offset.zero)
+              IgnorePointer(
+                child: _InteractivePointer(
+                  position: pointerPosition,
+                  controller: _animController,
+                  isTimerArrow:
+                      step == TutorialStep.explainTimer ||
+                      step == TutorialStep.tryStorm ||
+                      step == TutorialStep.trySmash ||
+                      step == TutorialStep.tryChronos,
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }
