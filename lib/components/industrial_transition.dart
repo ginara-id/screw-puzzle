@@ -71,6 +71,10 @@ class IndustrialTransitionComponent extends PositionComponent with HasGameRef<Sc
       // unless we are in the Main Menu.
       if (!gameRef.overlays.isActive('MainMenu')) {
         gameRef.overlays.add('HUD');
+        if (gameRef.overlays.isActive('Tutorial')) {
+          gameRef.overlays.remove('Tutorial');
+          gameRef.overlays.add('Tutorial');
+        }
         gameRef.audio.playGameBGM();
       } else {
         gameRef.audio.playMenuBGM();

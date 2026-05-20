@@ -4058,7 +4058,7 @@ class _TutorialOverlayState extends State<TutorialOverlay>
             // Center perfectly over the timer digits in the bottom dock
             final adHeight = widget.game.hasActiveBannerAd ? 50.0 : 0.0;
             final timerX = screenWidth - 85;
-            final timerY = screenHeight - (65 + bottomPadding + adHeight);
+            final timerY = screenHeight - (67 + bottomPadding + adHeight);
     
             pointerPosition = Offset(timerX, timerY);
             showPointer = true;
@@ -4172,8 +4172,8 @@ class _TutorialOverlayState extends State<TutorialOverlay>
               final bottomPadding = MediaQuery.of(context).padding.bottom;
               final adHeight = widget.game.hasActiveBannerAd ? 50.0 : 0.0;
               pointerPosition = Offset(
-                207,
-                screenHeight - (70 + adHeight + bottomPadding),
+                202,
+                screenHeight - (67 + adHeight + bottomPadding),
               );
               showPointer = true;
               alignment = const Alignment(0, -0.15);
@@ -4198,8 +4198,8 @@ class _TutorialOverlayState extends State<TutorialOverlay>
               final bottomPadding = MediaQuery.of(context).padding.bottom;
               final adHeight = widget.game.hasActiveBannerAd ? 50.0 : 0.0;
               pointerPosition = Offset(
-                137,
-                screenHeight - (70 + adHeight + bottomPadding),
+                134,
+                screenHeight - (67 + adHeight + bottomPadding),
               );
               showPointer = true;
               alignment = const Alignment(0, -0.15);
@@ -4224,8 +4224,8 @@ class _TutorialOverlayState extends State<TutorialOverlay>
               final bottomPadding = MediaQuery.of(context).padding.bottom;
               final adHeight = widget.game.hasActiveBannerAd ? 50.0 : 0.0;
               pointerPosition = Offset(
-                67,
-                screenHeight - (70 + adHeight + bottomPadding),
+                66,
+                screenHeight - (67 + adHeight + bottomPadding),
               );
               showPointer = true;
               alignment = const Alignment(0, -0.15);
